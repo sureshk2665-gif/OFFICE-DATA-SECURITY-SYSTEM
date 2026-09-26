@@ -1,0 +1,12 @@
+bin/
+obj/
+artifacts/
+publish/
+*.user
+*.suo
+.vs/
+.idea/
+TestResults/
+*.db
+*.db-wal
+*.db-shm

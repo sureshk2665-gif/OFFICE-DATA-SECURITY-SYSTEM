@@ -1,0 +1,30 @@
+OFFICE COMPUTER SECURITY SYSTEM - DEVELOPMENT BUILD (PHASE 1)
+==============================================================
+
+IMPORTANT: This is an early development build. It does NOT protect any computer yet.
+Nothing is blocked. USB, software and file protection are added in later phases.
+Use it only on a test computer.
+
+Folders in this package
+  Server\          OfficeSecurity.Server.exe          Central server (runs on one office PC)
+  Agent\           OfficeSecurity.Agent.exe           Security agent (will run on every PC)
+  AdminDashboard\  OfficeSecurity.AdminDashboard.exe  Administrator program
+  StaffApp\        OfficeSecurity.StaffApp.exe        Staff program
+
+Try it (on one Windows 10/11 test PC)
+  1. Open the Server folder and double-click OfficeSecurity.Server.exe.
+     A black window opens and shows "Now listening on: http://127.0.0.1:5080".
+     Leave it open.
+  2. Double-click AdminDashboard\OfficeSecurity.AdminDashboard.exe.
+     The Overview page should show a green dot: "Connected".
+  3. Double-click StaffApp\OfficeSecurity.StaffApp.exe.
+     It should show "Connected to the office security server".
+  4. Close the server window. Click "Check again" in the dashboard: the dot turns red.
+  5. (Optional) Double-click Agent\OfficeSecurity.Agent.exe. Its window lists all
+     18 security controls as "NotImplemented". This is correct for Phase 1.
+
+Windows SmartScreen may warn "Windows protected your PC" because this development build is not code-signed yet.
+Click "More info" and then "Run anyway" (test PC only).
+
+In Phase 1 the server only accepts connections from the same PC (127.0.0.1).
+Secure network (HTTPS) access for other PCs is added in Phase 2.

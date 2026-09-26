@@ -1,0 +1,26 @@
+<Solution>
+  <Folder Name="/src/" />
+  <Folder Name="/src/Agent/">
+    <Project Path="src/Agent/OfficeSecurity.Agent.Enforcement/OfficeSecurity.Agent.Enforcement.csproj" />
+    <Project Path="src/Agent/OfficeSecurity.Agent/OfficeSecurity.Agent.csproj" />
+  </Folder>
+  <Folder Name="/src/Clients/">
+    <Project Path="src/Clients/OfficeSecurity.AdminDashboard/OfficeSecurity.AdminDashboard.csproj" />
+    <Project Path="src/Clients/OfficeSecurity.Client.Core/OfficeSecurity.Client.Core.csproj" />
+    <Project Path="src/Clients/OfficeSecurity.Client.Wpf/OfficeSecurity.Client.Wpf.csproj" />
+    <Project Path="src/Clients/OfficeSecurity.StaffApp/OfficeSecurity.StaffApp.csproj" />
+  </Folder>
+  <Folder Name="/src/Server/">
+    <Project Path="src/Server/OfficeSecurity.Server.Api/OfficeSecurity.Server.Api.csproj" />
+  </Folder>
+  <Folder Name="/src/Shared/">
+    <Project Path="src/Shared/OfficeSecurity.Contracts/OfficeSecurity.Contracts.csproj" />
+    <Project Path="src/Shared/OfficeSecurity.Policy/OfficeSecurity.Policy.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/OfficeSecurity.Agent.UnitTests/OfficeSecurity.Agent.UnitTests.csproj" />
+    <Project Path="tests/OfficeSecurity.Client.Core.Tests/OfficeSecurity.Client.Core.Tests.csproj" />
+    <Project Path="tests/OfficeSecurity.Policy.Tests/OfficeSecurity.Policy.Tests.csproj" />
+    <Project Path="tests/OfficeSecurity.Server.IntegrationTests/OfficeSecurity.Server.IntegrationTests.csproj" />
+  </Folder>
+</Solution>

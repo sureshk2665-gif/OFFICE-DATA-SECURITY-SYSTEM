@@ -1,6 +1,6 @@
 # Office Computer Security System — Architecture & Implementation Plan
 
-Status: **PROPOSAL — awaiting approval before Phase 1 starts**
+Status: **APPROVED 2026-09-26** — Phase 1 in progress. Later decisions are recorded as ADRs in `docs/adr/` and take precedence over this document (notably ADR-0002: SQLite is now the default central database).
 Scope of this document: the "First Task" of the master specification (sections 1–14 below).
 No application code has been written yet. The repository was empty (only a one-line README) at the time of analysis.
 
@@ -101,7 +101,7 @@ Linux VM) is the minimum reliable option.
 | Windows APIs | CfgMgr32/SetupAPI (P/Invoke), WMI/CIM, `System.Diagnostics.Eventing.Reader`, `netsh advfirewall`/`INetFwPolicy2` COM, `CiTool.exe`, `auditpol`, `icacls`/`System.Security.AccessControl`, BitLocker WMI | All documented, supported interfaces. |
 | Server | ASP.NET Core Web API (minimal APIs or controllers), Kestrel with HTTPS + client-cert auth | Can run as a Windows Service; no IIS required. |
 | ORM / migrations | EF Core + Npgsql, code-first migrations | Versioned, reviewable schema changes. |
-| Central DB | **PostgreSQL 16+** | Free, concurrent, robust, row-level/role permissions for append-only audit. SQL Server Express is an alternative but has a 10 GB DB size cap. |
+| Central DB | ~~PostgreSQL 16+~~ → **SQLite, single-writer server (see ADR-0002)**; PostgreSQL optional later | No separate DB install for a non-technical office; only the server process opens the file. |
 | Agent local store | SQLite (Microsoft.Data.Sqlite) | Single-writer local queue/cache only — appropriate use of SQLite. |
 | Password hashing | ASP.NET Core Identity `PasswordHasher` (PBKDF2-HMAC-SHA512, ≥600k iterations) | No extra dependency; admin accounts additionally get TOTP MFA. |
 | Tokens | Short-lived JWT access + rotating refresh tokens (stored hashed server-side) | Revocable sessions. |
@@ -160,7 +160,7 @@ OFFICE-DATA-SECURITY-SYSTEM/
 
 ---
 
-## 4. Database schema (PostgreSQL)
+## 4. Database schema (provider-neutral; SQLite by default per ADR-0002)
 
 Conventions: `uuid` primary keys, `timestamptz` in UTC, `created_at/updated_at`, soft-delete via
 `status` where history must be preserved, `xmin`-based optimistic concurrency. All FKs indexed.
