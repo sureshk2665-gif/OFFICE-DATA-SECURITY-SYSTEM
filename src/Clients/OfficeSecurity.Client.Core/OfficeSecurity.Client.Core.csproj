@@ -9,5 +9,6 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\Shared\OfficeSecurity.Contracts\OfficeSecurity.Contracts.csproj" />
+    <ProjectReference Include="..\..\Shared\OfficeSecurity.Policy\OfficeSecurity.Policy.csproj" />
   </ItemGroup>
 </Project>

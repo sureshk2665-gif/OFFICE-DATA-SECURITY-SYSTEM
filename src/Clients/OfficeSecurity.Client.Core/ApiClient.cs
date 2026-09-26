@@ -5,6 +5,7 @@ using System.Net.Http.Json;
 using System.Security.Cryptography.X509Certificates;
 using System.Text.Json;
 using OfficeSecurity.Contracts;
+using OfficeSecurity.Policy;
 
 namespace OfficeSecurity.Client.Core;
 
@@ -192,6 +193,48 @@ public sealed class ApiClient : IDisposable
     public Task<AuditVerificationResponse> VerifyAuditAsync(CancellationToken ct = default) =>
         SendAsync<AuditVerificationResponse>(HttpMethod.Get, ApiRoutes.AuditVerify, null, ct);
 
+    public Task<EnrollmentCodeResponse> CreateEnrollmentCodeAsync(CancellationToken ct = default) =>
+        SendAsync<EnrollmentCodeResponse>(HttpMethod.Post, ApiRoutes.EnrollmentCodes, null, ct);
+
+    public Task<PagedResult<ComputerSummary>> ListComputersAsync(int page, int pageSize, string? search, string? status, CancellationToken ct = default) =>
+        SendAsync<PagedResult<ComputerSummary>>(HttpMethod.Get, ApiRoutes.Computers + Query(("page", page), ("pageSize", pageSize), ("search", search), ("status", status)), null, ct);
+
+    public Task<ComputerDetail> GetComputerAsync(Guid id, CancellationToken ct = default) =>
+        SendAsync<ComputerDetail>(HttpMethod.Get, ApiRoutes.ComputerById(id), null, ct);
+
+    public Task<ComputerSummary> ApproveComputerAsync(Guid id, CancellationToken ct = default) =>
+        SendAsync<ComputerSummary>(HttpMethod.Post, ApiRoutes.ComputerApprove(id), null, ct);
+
+    public Task<ComputerSummary> RejectComputerAsync(Guid id, CancellationToken ct = default) =>
+        SendAsync<ComputerSummary>(HttpMethod.Post, ApiRoutes.ComputerReject(id), null, ct);
+
+    public Task<ComputerSummary> RetireComputerAsync(Guid id, CancellationToken ct = default) =>
+        SendAsync<ComputerSummary>(HttpMethod.Post, ApiRoutes.ComputerRetire(id), null, ct);
+
+    public Task<ComputerSummary> AssignComputerPolicyAsync(Guid id, Guid? policyId, CancellationToken ct = default) =>
+        SendAsync<ComputerSummary>(HttpMethod.Put, ApiRoutes.ComputerPolicy(id), new AssignPolicyRequest(policyId), ct);
+
+    public Task<List<StaffReference>> AssignComputerStaffAsync(Guid id, IReadOnlyList<Guid> staffIds, CancellationToken ct = default) =>
+        SendAsync<List<StaffReference>>(HttpMethod.Put, ApiRoutes.ComputerStaff(id), new AssignStaffRequest(staffIds), ct);
+
+    public Task<PagedResult<SecurityEventResponse>> ListEventsAsync(int page, int pageSize, Guid? computerId, string? search, CancellationToken ct = default) =>
+        SendAsync<PagedResult<SecurityEventResponse>>(HttpMethod.Get, ApiRoutes.Events + Query(("page", page), ("pageSize", pageSize), ("computerId", computerId), ("search", search)), null, ct);
+
+    public Task<List<PolicySummary>> ListPoliciesAsync(CancellationToken ct = default) =>
+        SendAsync<List<PolicySummary>>(HttpMethod.Get, ApiRoutes.Policies, null, ct);
+
+    public Task<PolicyDetail> GetPolicyAsync(Guid id, CancellationToken ct = default) =>
+        SendAsync<PolicyDetail>(HttpMethod.Get, ApiRoutes.PolicyById(id), null, ct);
+
+    public Task<PolicyDetail> CreatePolicyAsync(SavePolicyRequest request, CancellationToken ct = default) =>
+        SendAsync<PolicyDetail>(HttpMethod.Post, ApiRoutes.Policies, request, ct);
+
+    public Task<PolicyDetail> UpdatePolicyAsync(Guid id, SavePolicyRequest request, CancellationToken ct = default) =>
+        SendAsync<PolicyDetail>(HttpMethod.Put, ApiRoutes.PolicyById(id), request, ct);
+
+    public Task DeletePolicyAsync(Guid id, CancellationToken ct = default) =>
+        SendAsync<object>(HttpMethod.Delete, ApiRoutes.PolicyById(id), null, ct);
+
     // ---------------------------------------------------------------- plumbing
 
     private CurrentUserResponse StartSession(SessionResponse session)
@@ -260,8 +303,6 @@ public sealed class ApiClient : IDisposable
         {
             case HttpStatusCode.TooManyRequests:
                 return "Too many attempts. Wait a minute and try again.";
-            case HttpStatusCode.Forbidden:
-                return "Your account is not allowed to do this.";
         }
 
         try
@@ -277,7 +318,9 @@ public sealed class ApiClient : IDisposable
             // Fall through to the generic message.
         }
 
-        return string.Create(CultureInfo.InvariantCulture, $"The server reported an error ({(int)response.StatusCode}).");
+        return response.StatusCode == HttpStatusCode.Forbidden
+            ? "Your account is not allowed to do this."
+            : string.Create(CultureInfo.InvariantCulture, $"The server reported an error ({(int)response.StatusCode}).");
     }
 
     private static string Query(params (string Name, object? Value)[] parameters)

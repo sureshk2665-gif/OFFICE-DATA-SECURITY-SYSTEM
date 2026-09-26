@@ -34,7 +34,7 @@ public sealed class CngDeviceKeyStore : IDeviceKeyStore
     {
         foreach (var provider in Providers)
         {
-            if (CngKey.Exists(keyName, provider, CngKeyOpenOptions.MachineKey))
+            if (Exists(keyName, provider))
             {
                 Description = Describe(provider);
                 return new ECDsaCng(CngKey.Open(keyName, provider, CngKeyOpenOptions.MachineKey));
@@ -68,11 +68,25 @@ public sealed class CngDeviceKeyStore : IDeviceKeyStore
     {
         foreach (var provider in Providers)
         {
-            if (CngKey.Exists(keyName, provider, CngKeyOpenOptions.MachineKey))
+            if (Exists(keyName, provider))
             {
                 using var key = CngKey.Open(keyName, provider, CngKeyOpenOptions.MachineKey);
                 key.Delete();
             }
+        }
+    }
+
+    // On computers without a usable TPM the platform provider cannot even be opened
+    // ("device not ready"); treat that as "no key there" rather than an error.
+    private static bool Exists(string keyName, CngProvider provider)
+    {
+        try
+        {
+            return CngKey.Exists(keyName, provider, CngKeyOpenOptions.MachineKey);
+        }
+        catch (CryptographicException) when (provider == CngProvider.MicrosoftPlatformCryptoProvider)
+        {
+            return false;
         }
     }
 
