@@ -1,0 +1,88 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:vm="clr-namespace:OfficeSecurity.StaffApp.ViewModels"
+                    xmlns:ui="clr-namespace:OfficeSecurity.Client.Wpf;assembly=OfficeSecurity.Client.Wpf">
+
+  <ResourceDictionary.MergedDictionaries>
+    <ResourceDictionary Source="pack://application:,,,/OfficeSecurity.Client.Wpf;component/Themes/SharedViews.xaml" />
+  </ResourceDictionary.MergedDictionaries>
+
+  <DataTemplate DataType="{x:Type vm:StaffLoginViewModel}">
+    <StackPanel>
+      <TextBlock Text="Staff sign-in" Style="{StaticResource Text.PageTitle}" />
+      <ContentControl Content="{Binding}" ContentTemplate="{StaticResource Messages}" />
+      <Border Style="{StaticResource Card}">
+        <StackPanel>
+          <TextBlock Text="Employee code" Style="{StaticResource Text.Label}" />
+          <TextBox Text="{Binding EmployeeCode, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource TextBox.Field}" />
+          <TextBlock Text="Password" Style="{StaticResource Text.Label}" />
+          <PasswordBox ui:PasswordBoxHelper.BoundPassword="{Binding Password}" Style="{StaticResource PasswordBox.Field}" />
+          <Button Content="Sign in" Command="{Binding SignInCommand}" IsEnabled="{Binding IsNotBusy}" IsDefault="True"
+                  Style="{StaticResource Button.Primary}" HorizontalAlignment="Left" Margin="0,16,0,16" />
+          <Button Content="First sign-in: I have a setup code from my administrator" Command="{Binding FirstSignInCommand}" Style="{StaticResource Button.Link}" />
+        </StackPanel>
+      </Border>
+      <Border Style="{StaticResource Card}">
+        <StackPanel>
+          <TextBlock Text="Security and privacy notice" Style="{StaticResource Text.SectionTitle}" />
+          <TextBlock Text="{x:Static vm:StaffHomeViewModel.SecurityNotice}" Style="{StaticResource Text.Body}" />
+        </StackPanel>
+      </Border>
+    </StackPanel>
+  </DataTemplate>
+
+  <DataTemplate DataType="{x:Type vm:StaffActivateViewModel}">
+    <StackPanel>
+      <TextBlock Text="First sign-in" Style="{StaticResource Text.PageTitle}" />
+      <TextBlock Text="Enter the setup code your administrator gave you, then choose your own password. Your administrator never sees your password."
+                 Style="{StaticResource Text.Muted}" Margin="0,0,0,12" />
+      <ContentControl Content="{Binding}" ContentTemplate="{StaticResource Messages}" />
+      <Border Style="{StaticResource Card}">
+        <StackPanel>
+          <TextBlock Text="Employee code" Style="{StaticResource Text.Label}" />
+          <TextBox Text="{Binding EmployeeCode, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource TextBox.Field}" />
+          <TextBlock Text="Setup code (for example K7QM-2XRP-9FTA)" Style="{StaticResource Text.Label}" />
+          <TextBox Text="{Binding SetupCode, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource TextBox.Field}" CharacterCasing="Upper" />
+          <TextBlock Text="New password (at least 12 characters; a short sentence works well)" Style="{StaticResource Text.Label}" />
+          <PasswordBox ui:PasswordBoxHelper.BoundPassword="{Binding Password}" Style="{StaticResource PasswordBox.Field}" />
+          <TextBlock Text="Confirm new password" Style="{StaticResource Text.Label}" />
+          <PasswordBox ui:PasswordBoxHelper.BoundPassword="{Binding ConfirmPassword}" Style="{StaticResource PasswordBox.Field}" />
+          <StackPanel Orientation="Horizontal" Margin="0,16,0,0">
+            <Button Content="Set password and sign in" Command="{Binding ActivateCommand}" IsEnabled="{Binding IsNotBusy}" IsDefault="True" Style="{StaticResource Button.Primary}" />
+            <Button Content="Back" Command="{Binding BackCommand}" Style="{StaticResource Button.Secondary}" Margin="8,0,0,0" />
+          </StackPanel>
+        </StackPanel>
+      </Border>
+    </StackPanel>
+  </DataTemplate>
+
+  <DataTemplate DataType="{x:Type vm:StaffHomeViewModel}">
+    <StackPanel>
+      <DockPanel Margin="0,0,0,16">
+        <Button DockPanel.Dock="Right" Content="Sign out" Command="{Binding SignOutCommand}" Style="{StaticResource Button.Secondary}" VerticalAlignment="Top" />
+        <StackPanel>
+          <TextBlock Text="Office Security" Style="{StaticResource Text.PageTitle}" Margin="0,0,0,4" />
+          <TextBlock Text="{Binding Greeting}" Style="{StaticResource Text.Muted}" />
+        </StackPanel>
+      </DockPanel>
+      <Border Style="{StaticResource Card}">
+        <StackPanel>
+          <TextBlock Text="Request software" Style="{StaticResource Text.SectionTitle}" />
+          <TextBlock Text="Software requests will be available after development Phase 4." Style="{StaticResource Text.Muted}" />
+        </StackPanel>
+      </Border>
+      <Border Style="{StaticResource Card}">
+        <StackPanel>
+          <TextBlock Text="Change your password" Style="{StaticResource Text.SectionTitle}" />
+          <ContentControl Content="{Binding ChangePassword}" />
+        </StackPanel>
+      </Border>
+      <Border Style="{StaticResource Card}">
+        <StackPanel>
+          <TextBlock Text="Security and privacy notice" Style="{StaticResource Text.SectionTitle}" />
+          <TextBlock Text="{x:Static vm:StaffHomeViewModel.SecurityNotice}" Style="{StaticResource Text.Body}" />
+        </StackPanel>
+      </Border>
+    </StackPanel>
+  </DataTemplate>
+</ResourceDictionary>

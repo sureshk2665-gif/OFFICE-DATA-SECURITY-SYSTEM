@@ -42,6 +42,22 @@ server CA and policy-signing keys · staff credentials.
 | E | Staff account calls admin API | Role-based authorization on every endpoint; an automated authz-matrix test covers all endpoints | 2 |
 | E | Agent used as a remote-access backdoor | No shell / arbitrary command API by design; installs are limited to admin-approved, hash-verified packages | 4 |
 
+## Phase 2 status
+Implemented and tested:
+- password hashing, TOTP two-step for administrators, lockout, sign-in rate limiting
+- server-side revocable sessions and role authorization with a deny-by-default fallback
+- the append-only, hash-chained audit log
+- the private CA with pinned HTTPS and pairing codes
+
+Implemented, but only partly verified:
+- The ACL-restricted data folder and DPAPI-protected keys on Windows are exercised by the Windows
+  server start-up test in CI.
+- No automated test yet checks that the folder permissions actually exclude standard users. This must be
+  checked manually on a test PC.
+
+Known gap: truncating the newest audit entries is not yet detectable. An external anchor (Windows Event
+Log) is planned for Phase 6.
+
 ## Residual risks (accepted, documented to owner)
 Local administrators can disable controls. Screenshots, photographs and uploads to *allowed* websites cannot be
 fully prevented without extra DLP products (plan §14).

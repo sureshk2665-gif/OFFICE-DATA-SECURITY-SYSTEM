@@ -1,0 +1,36 @@
+# Database schema (Phase 2)
+
+## Storage
+
+- SQLite file `office-security.db` in the server data folder (ADR-0002), in WAL mode.
+- Migrations are in `src/Server/OfficeSecurity.Server.Infrastructure/Persistence/Migrations` and are applied
+  automatically at server start.
+- Timestamps are stored as exact UTC ticks (`INTEGER`).
+- Enums are stored as text.
+
+## Tables
+
+| Table | Purpose | Key constraints |
+|---|---|---|
+| `admin_accounts` | Administrators: user name, role, status, PBKDF2 password hash, encrypted TOTP secret, lockout counters | Unique `NormalizedUsername` |
+| `staff_accounts` | Staff: employee code, name, department, status, PBKDF2 password hash, lockout counters | Unique `NormalizedEmployeeCode`; indexes on `Status`, `DisplayName` |
+| `account_setup_codes` | One-time setup/bootstrap codes (SHA-256 hash only), expiry, used/revoked time | Index (`AccountType`, `AccountId`), index `CodeHash` |
+| `sessions` | Signed-in sessions (SHA-256 of token), last seen, expiry, end reason, source IP | Unique `TokenHash`; index (`PrincipalType`, `PrincipalId`) |
+| `audit_log` | Append-only, hash-chained audit trail | Triggers `audit_log_no_update` / `audit_log_no_delete` reject changes; indexes on `OccurredAtUtc`, `Action` |
+
+## Audit hash chain
+
+Each entry stores:
+- `PreviousHash`: the previous entry's hash
+- `Hash`: SHA-256 over all fields plus `PreviousHash`
+
+`GET /api/v1/audit/verify` recomputes the chain.
+
+- **Detected:** editing, inserting or deleting any entry except the newest ones.
+- **Limitation:** truncating the newest entries is only detectable against an external anchor, which is
+  planned for Phase 6.
+
+## Not stored
+
+Plain-text passwords, setup codes, session tokens and TOTP secrets are never stored. An automated test scans
+the raw database file for them.

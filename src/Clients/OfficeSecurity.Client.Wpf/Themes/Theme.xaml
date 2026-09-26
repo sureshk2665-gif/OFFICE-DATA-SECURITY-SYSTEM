@@ -137,4 +137,89 @@
     <Setter Property="ItemContainerStyle" Value="{StaticResource NavItem}" />
     <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled" />
   </Style>
+
+  <SolidColorBrush x:Key="Brush.ErrorBackground" Color="#FDECEA" />
+  <SolidColorBrush x:Key="Brush.SuccessBackground" Color="#E6F4EA" />
+  <SolidColorBrush x:Key="Brush.SecondaryButton" Color="#E8ECF2" />
+
+  <Style x:Key="Banner.Error" TargetType="Border">
+    <Setter Property="Background" Value="{StaticResource Brush.ErrorBackground}" />
+    <Setter Property="BorderBrush" Value="{StaticResource Brush.Danger}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="6" />
+    <Setter Property="Padding" Value="12,8" />
+    <Setter Property="Margin" Value="0,0,0,12" />
+  </Style>
+
+  <Style x:Key="Banner.Success" TargetType="Border">
+    <Setter Property="Background" Value="{StaticResource Brush.SuccessBackground}" />
+    <Setter Property="BorderBrush" Value="{StaticResource Brush.Success}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="6" />
+    <Setter Property="Padding" Value="12,8" />
+    <Setter Property="Margin" Value="0,0,0,12" />
+  </Style>
+
+  <Style x:Key="Text.Label" TargetType="TextBlock">
+    <Setter Property="FontFamily" Value="{StaticResource Font.Main}" />
+    <Setter Property="FontSize" Value="12" />
+    <Setter Property="Foreground" Value="{StaticResource Brush.TextMuted}" />
+    <Setter Property="Margin" Value="0,8,0,4" />
+  </Style>
+
+  <Style x:Key="Text.Code" TargetType="TextBox">
+    <Setter Property="FontFamily" Value="Consolas" />
+    <Setter Property="FontSize" Value="20" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="IsReadOnly" Value="True" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="Background" Value="Transparent" />
+  </Style>
+
+  <Style x:Key="Button.Secondary" TargetType="Button" BasedOn="{StaticResource Button.Primary}">
+    <Setter Property="Foreground" Value="{StaticResource Brush.Text}" />
+    <Setter Property="Background" Value="{StaticResource Brush.SecondaryButton}" />
+  </Style>
+
+  <Style x:Key="Button.Danger" TargetType="Button" BasedOn="{StaticResource Button.Primary}">
+    <Setter Property="Background" Value="{StaticResource Brush.Danger}" />
+  </Style>
+
+  <Style x:Key="Button.Link" TargetType="Button">
+    <Setter Property="Foreground" Value="{StaticResource Brush.Accent}" />
+    <Setter Property="FontFamily" Value="{StaticResource Font.Main}" />
+    <Setter Property="FontSize" Value="13" />
+    <Setter Property="Cursor" Value="Hand" />
+    <Setter Property="HorizontalAlignment" Value="Left" />
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="Button">
+          <TextBlock x:Name="Text" Text="{Binding Content, RelativeSource={RelativeSource TemplatedParent}}" TextDecorations="Underline" />
+          <ControlTemplate.Triggers>
+            <Trigger Property="IsEnabled" Value="False">
+              <Setter TargetName="Text" Property="Opacity" Value="0.5" />
+            </Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
+  <Style x:Key="Grid.Table" TargetType="DataGrid">
+    <Setter Property="AutoGenerateColumns" Value="False" />
+    <Setter Property="IsReadOnly" Value="True" />
+    <Setter Property="CanUserAddRows" Value="False" />
+    <Setter Property="CanUserDeleteRows" Value="False" />
+    <Setter Property="SelectionMode" Value="Single" />
+    <Setter Property="HeadersVisibility" Value="Column" />
+    <Setter Property="GridLinesVisibility" Value="Horizontal" />
+    <Setter Property="HorizontalGridLinesBrush" Value="{StaticResource Brush.Border}" />
+    <Setter Property="BorderBrush" Value="{StaticResource Brush.Border}" />
+    <Setter Property="Background" Value="{StaticResource Brush.Surface}" />
+    <Setter Property="RowHeight" Value="32" />
+    <Setter Property="FontFamily" Value="{StaticResource Font.Main}" />
+    <Setter Property="FontSize" Value="13" />
+  </Style>
+
+  <BooleanToVisibilityConverter x:Key="BoolToVisibility" />
 </ResourceDictionary>

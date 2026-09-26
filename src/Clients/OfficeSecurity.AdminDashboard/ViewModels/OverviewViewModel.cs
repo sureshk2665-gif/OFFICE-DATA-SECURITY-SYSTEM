@@ -1,41 +1,36 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using OfficeSecurity.Contracts;
 
 namespace OfficeSecurity.AdminDashboard.ViewModels;
 
-/// <summary>Overview page. Phase 1 shows the live central-server connection only; no statistics are invented.</summary>
-public sealed partial class OverviewViewModel : SectionViewModel
+/// <summary>Overview page showing real figures from the server; nothing is estimated or invented.</summary>
+public sealed partial class OverviewViewModel(ShellViewModel shell) : SectionViewModel("Overview")
 {
-    private readonly SettingsService _settings;
+    [ObservableProperty]
+    public partial DashboardOverviewResponse? Overview { get; set; }
 
-    public OverviewViewModel(SettingsService settings) : base("Overview")
-    {
-        _settings = settings;
-        _settings.Changed += (_, _) => CheckServerCommand.Execute(null);
-    }
-
-    /// <summary><c>null</c> until the first check completes.</summary>
     [ObservableProperty]
     public partial bool? IsServerReachable { get; set; }
 
     [ObservableProperty]
-    public partial string ServerStatusText { get; set; } = "Not checked yet";
+    public partial string ServerText { get; set; } = "Checking…";
 
-    [ObservableProperty]
-    public partial string ServerDetails { get; set; } = string.Empty;
+    public string ServerAddress => shell.Settings.ServerAddress;
 
-    public string ServerAddress => _settings.Current.ServerAddress;
+    public override Task ActivateAsync() => RefreshAsync();
 
     [RelayCommand]
-    private async Task CheckServerAsync()
+    private Task RefreshAsync() => RunAsync(async () =>
     {
-        OnPropertyChanged(nameof(ServerAddress));
-        ServerStatusText = "Checking…";
-        var result = await _settings.CreateServerClient().CheckHealthAsync();
-        IsServerReachable = result.IsReachable;
-        ServerStatusText = result.IsReachable ? "Connected" : "Not reachable";
-        ServerDetails = result.IsReachable
-            ? $"Server version {result.Health!.ServerVersion} · checked {DateTime.Now:HH:mm:ss}"
-            : result.Error ?? string.Empty;
-    }
+        var health = await shell.Api.CheckHealthAsync();
+        IsServerReachable = health.IsReachable;
+        ServerText = health.IsReachable
+            ? $"Connected · server version {health.Health!.ServerVersion.Split('+')[0]} · checked {DateTime.Now:HH:mm:ss}"
+            : "Not reachable: " + health.Error;
+        if (health.IsReachable)
+        {
+            Overview = await shell.Api.GetOverviewAsync();
+        }
+    });
 }

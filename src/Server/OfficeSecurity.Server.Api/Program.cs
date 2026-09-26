@@ -1,5 +1,19 @@
 using System.Reflection;
+using System.Security.Authentication;
+using System.Security.Cryptography.X509Certificates;
+using System.Threading.RateLimiting;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.EntityFrameworkCore;
 using OfficeSecurity.Contracts;
+using OfficeSecurity.Server.Api.Endpoints;
+using OfficeSecurity.Server.Api.Hosting;
+using OfficeSecurity.Server.Api.Security;
+using OfficeSecurity.Server.Application.Abstractions;
+using OfficeSecurity.Server.Application.Common;
+using OfficeSecurity.Server.Application.Security;
+using OfficeSecurity.Server.Application.Services;
+using OfficeSecurity.Server.Infrastructure.Certificates;
+using OfficeSecurity.Server.Infrastructure.Persistence;
 
 var builder = WebApplication.CreateBuilder(new WebApplicationOptions
 {
@@ -11,19 +25,85 @@ var builder = WebApplication.CreateBuilder(new WebApplicationOptions
 // Runs as a Windows Service when started by the Service Control Manager; as a console app otherwise.
 builder.Host.UseWindowsService(options => options.ServiceName = "OfficeSecurityServer");
 
-builder.Services.AddProblemDetails();
+// ---------------------------------------------------------------- data directory, secrets, certificates
+var paths = new ServerPaths(builder.Configuration["Server:DataDirectory"] is { Length: > 0 } dir ? dir : ServerPaths.DefaultDataDirectory());
+DataDirectoryProtection.CreateAndProtect(paths.DataDirectory);
+var secretProtector = DataProtectionSecretProtector.Create(paths.KeysDirectory);
+var certificates = new ServerCertificateAuthority(paths.CertificatesDirectory, secretProtector, TimeProvider.System)
+    .LoadOrCreate(builder.Configuration.GetSection("Server:AdditionalHostNames").Get<string[]>());
+var httpsPort = builder.Configuration.GetValue("Server:HttpsPort", 5443);
+
+builder.WebHost.ConfigureKestrel(kestrel =>
+{
+    kestrel.AddServerHeader = false;
+    kestrel.ListenAnyIP(httpsPort, listen => listen.UseHttps(https =>
+    {
+        https.SslProtocols = SslProtocols.Tls12 | SslProtocols.Tls13;
+        https.ServerCertificate = X509CertificateLoader.LoadPkcs12(
+            certificates.ServerCertificatePfx,
+            password: null,
+            // Windows SChannel cannot use ephemeral keys for a TLS server certificate.
+            OperatingSystem.IsWindows() ? X509KeyStorageFlags.DefaultKeySet : X509KeyStorageFlags.EphemeralKeySet);
+    }));
+});
+
+// ---------------------------------------------------------------- services
+builder.Services.AddSingleton(paths);
+builder.Services.AddSingleton(certificates);
+builder.Services.AddSingleton<ISecretProtector>(secretProtector);
 builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.Configure<SecurityOptions>(builder.Configuration.GetSection(SecurityOptions.SectionName));
+
+builder.Services.AddDbContext<ServerDbContext>(options => options.UseSqlite(DatabaseInitializer.BuildConnectionString(paths.DatabaseFile)));
+builder.Services.AddScoped<IServerDbContext>(sp => sp.GetRequiredService<ServerDbContext>());
+
+builder.Services.AddSingleton(sp => new PasswordHasher(
+    sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<SecurityOptions>>().Value.PasswordHashIterations));
+builder.Services.AddSingleton<OneTimeTicketStore<AdminMfaTicket>>();
+builder.Services.AddSingleton<OneTimeTicketStore<AdminEnrollmentTicket>>();
+builder.Services.AddSingleton<AuditChainLock>();
+builder.Services.AddScoped<AuditLog>();
+builder.Services.AddScoped<AuthService>();
+builder.Services.AddScoped<AccountAdministration>();
+
+builder.Services.AddAuthentication(SessionAuthenticationHandler.SchemeName)
+    .AddScheme<AuthenticationSchemeOptions, SessionAuthenticationHandler>(SessionAuthenticationHandler.SchemeName, null);
+builder.Services.AddAuthorization(Policies.Configure);
+
+var signInRequestsPerMinute = builder.Configuration.GetValue("Security:SignInRequestsPerMinute", 20);
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.AddPolicy(AuthEndpoints.SignInRateLimit, http => RateLimitPartition.GetFixedWindowLimiter(
+        http.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        _ => new FixedWindowRateLimiterOptions { PermitLimit = signInRequestsPerMinute, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
+});
+
+builder.Services.AddProblemDetails();
 
 var app = builder.Build();
 
 app.UseExceptionHandler();
+app.UseStatusCodePages();
+app.UseAuthentication();
+app.UseAuthorization();
+app.UseRateLimiter();
 
+// ---------------------------------------------------------------- endpoints
 var version = typeof(Program).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "unknown";
 
-app.MapGet(ApiRoutes.Health, (TimeProvider clock) =>
-    TypedResults.Ok(new HealthResponse("Healthy", version, clock.GetUtcNow())));
+app.MapGet(ApiRoutes.Health, (TimeProvider clock) => TypedResults.Ok(new HealthResponse("Healthy", version, clock.GetUtcNow())))
+    .AllowAnonymous();
 
-app.Run();
+// The CA certificate is public; clients verify it against the pairing code before trusting it.
+app.MapGet(ApiRoutes.CaCertificate, (ServerCertificates certs) => TypedResults.Bytes(certs.CaCertificate.RawData, "application/pkix-cert"))
+    .AllowAnonymous();
+
+app.MapAuthEndpoints();
+app.MapAdministrationEndpoints();
+
+await ServerStartup.InitializeAsync(app, certificates, httpsPort);
+await app.RunAsync();
 
 /// <summary>Entry point marker for integration tests.</summary>
 public partial class Program;

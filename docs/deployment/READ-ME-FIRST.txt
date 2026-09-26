@@ -1,30 +1,62 @@
-OFFICE COMPUTER SECURITY SYSTEM - DEVELOPMENT BUILD (PHASE 1)
+OFFICE COMPUTER SECURITY SYSTEM - DEVELOPMENT BUILD (PHASE 2)
 ==============================================================
 
-IMPORTANT: This is an early development build. It does NOT protect any computer yet.
-Nothing is blocked. USB, software and file protection are added in later phases.
-Use it only on a test computer.
+IMPORTANT: This build does NOT protect any computer yet. Nothing is blocked.
+Phase 2 adds secure sign-in, staff accounts and the audit log.
+USB, software and file protection come in later phases.
+Use it on test computers only.
 
 Folders in this package
-  Server\          OfficeSecurity.Server.exe          Central server (runs on one office PC)
-  Agent\           OfficeSecurity.Agent.exe           Security agent (will run on every PC)
+  Server\          OfficeSecurity.Server.exe          Central server (one office PC)
   AdminDashboard\  OfficeSecurity.AdminDashboard.exe  Administrator program
   StaffApp\        OfficeSecurity.StaffApp.exe        Staff program
+  Agent\           OfficeSecurity.Agent.exe           Security agent (not used yet in Phase 2)
 
-Try it (on one Windows 10/11 test PC)
-  1. Open the Server folder and double-click OfficeSecurity.Server.exe.
-     A black window opens and shows "Now listening on: http://127.0.0.1:5080".
-     Leave it open.
-  2. Double-click AdminDashboard\OfficeSecurity.AdminDashboard.exe.
-     The Overview page should show a green dot: "Connected".
-  3. Double-click StaffApp\OfficeSecurity.StaffApp.exe.
-     It should show "Connected to the office security server".
-  4. Close the server window. Click "Check again" in the dashboard: the dot turns red.
-  5. (Optional) Double-click Agent\OfficeSecurity.Agent.exe. Its window lists all
-     18 security controls as "NotImplemented". This is correct for Phase 1.
+You will need: a smartphone with an authenticator app
+(Microsoft Authenticator or Google Authenticator, both free).
 
-Windows SmartScreen may warn "Windows protected your PC" because this development build is not code-signed yet.
-Click "More info" and then "Run anyway" (test PC only).
+STEP 1 - Start the server (on the PC that will be the office server)
+  Right-click Server\OfficeSecurity.Server.exe and choose "Run as administrator".
+  A black window opens. Leave it open. It shows:
+    - the server addresses, for example https://192.168.1.20:5443
+    - a PAIRING CODE, for example 6162-C295-C5AF-BC9A-60DD
+    - a FIRST ADMINISTRATOR SETUP CODE, for example K7QM-2XRP-9FTA
+  The same information is saved in C:\ProgramData\OfficeSecurity\Server\
+  (SERVER-CONNECTION-INFO.txt and FIRST-ADMIN-SETUP-CODE.txt).
+  If Windows Firewall asks, allow access on "Private networks" so other office PCs can connect.
 
-In Phase 1 the server only accepts connections from the same PC (127.0.0.1).
-Secure network (HTTPS) access for other PCs is added in Phase 2.
+STEP 2 - Connect the administrator dashboard
+  Start AdminDashboard\OfficeSecurity.AdminDashboard.exe (on the server PC or another office PC).
+  Type the server address (for example 192.168.1.20) and the pairing code, then click Connect.
+  The pairing code proves the dashboard is talking to YOUR server.
+
+STEP 3 - Create the first administrator
+  Enter the first administrator setup code, choose a user name, your name and a password
+  (at least 12 characters; a short sentence such as "Blue tractor at noon" works well).
+  Scan the QR code with your authenticator app and type the 6-digit code it shows.
+  Then sign in with your user name, password and the current 6-digit code.
+
+STEP 4 - Add a staff member
+  Open "Staff Accounts" and click "Add staff member". Enter an employee code (for example EMP001)
+  and a name. The dashboard shows a one-time SETUP CODE. Give it to the staff member.
+  (You never see or choose their password.)
+
+STEP 5 - Staff first sign-in
+  On a staff PC, start StaffApp\OfficeSecurity.StaffApp.exe and connect with the server address
+  and pairing code (a one-time step for each PC).
+  Click "First sign-in", enter the employee code, the setup code and a new password.
+
+STEP 6 - Look at the audit log
+  In the dashboard open "Audit Logs". Every sign-in, failed sign-in and account change is listed.
+  Click "Verify integrity" to check that nobody has altered the log.
+
+Good to know
+  - 5 wrong attempts lock an account for 15 minutes.
+  - Forgot a staff password? Select the staff member and click "Issue new setup code".
+  - Lost your phone? Another super administrator can reset your account. Create a second
+    super administrator under "Administrators" so you are never locked out.
+  - Back up the whole folder C:\ProgramData\OfficeSecurity\Server regularly.
+    It holds the database and the keys.
+
+Windows SmartScreen may say "Windows protected your PC", because development builds are not
+code-signed yet. Click "More info" and then "Run anyway" (test PCs only).

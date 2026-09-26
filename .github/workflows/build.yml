@@ -56,9 +56,63 @@ jobs:
           }
           Copy-Item docs/deployment/READ-ME-FIRST.txt publish/OfficeSecurity-win-x64/
 
+      - name: Screen self-test (admin dashboard and staff app)
+        shell: pwsh
+        run: |
+          $root = "publish/OfficeSecurity-win-x64"
+          $failed = $false
+          foreach ($app in @("AdminDashboard", "StaffApp")) {
+            $log = Join-Path $env:RUNNER_TEMP "$app-smoke.log"
+            $p = Start-Process -FilePath "$root/$app/OfficeSecurity.$app.exe" -ArgumentList "--smoke-test", "`"$log`"" -PassThru -Wait
+            Write-Host "---- $app (exit code $($p.ExitCode))"
+            if (Test-Path $log) { Get-Content $log } else { Write-Host "No log written." }
+            if ($p.ExitCode -ne 0) { $failed = $true }
+          }
+          if ($failed) { exit 1 }
+
+      - name: Server start-up test on Windows (HTTPS, data protection, first-time setup)
+        shell: pwsh
+        run: |
+          $data = Join-Path $env:RUNNER_TEMP "ocss-server-data"
+          $env:Server__DataDirectory = $data
+          $out = Join-Path $env:RUNNER_TEMP "server.out.log"
+          $err = Join-Path $env:RUNNER_TEMP "server.err.log"
+          $p = Start-Process -FilePath "publish/OfficeSecurity-win-x64/Server/OfficeSecurity.Server.exe" -PassThru -RedirectStandardOutput $out -RedirectStandardError $err
+          $health = $null
+          for ($i = 0; $i -lt 60 -and -not $health; $i++) {
+            try { $health = Invoke-RestMethod -Uri "https://localhost:5443/api/v1/health" -SkipCertificateCheck } catch { Start-Sleep -Seconds 1 }
+          }
+          try {
+            if (-not $health) { throw "Server did not answer on https://localhost:5443" }
+            Write-Host "Health: $($health.status) $($health.serverVersion)"
+            $setup = Invoke-RestMethod -Uri "https://localhost:5443/api/v1/setup/status" -SkipCertificateCheck
+            if (-not $setup.firstAdminSetupRequired) { throw "Expected first-time setup to be required" }
+            foreach ($f in @("FIRST-ADMIN-SETUP-CODE.txt", "SERVER-CONNECTION-INFO.txt", "office-security.db")) {
+              if (-not (Test-Path (Join-Path $data $f))) { throw "Missing $f in data directory" }
+            }
+            try { Invoke-WebRequest -Uri "https://localhost:5443/api/v1/staff" -SkipCertificateCheck | Out-Null; throw "Staff list was reachable without signing in" }
+            catch { if ($_.Exception.Response.StatusCode.value__ -ne 401) { throw } }
+            Write-Host "Server start-up test passed."
+          }
+          finally {
+            Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue
+            Write-Host "---- server output"; Get-Content $out -ErrorAction SilentlyContinue
+            Get-Content $err -ErrorAction SilentlyContinue
+          }
+
       - name: Upload executables
         uses: actions/upload-artifact@v4
         with:
           name: OfficeSecurity-win-x64
           path: publish/OfficeSecurity-win-x64
           retention-days: 30
+
+  secret-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Scan repository history for committed secrets (gitleaks)
+        run: docker run --rm -v "$PWD:/repo" zricethezav/gitleaks:latest detect --source /repo --redact --verbose

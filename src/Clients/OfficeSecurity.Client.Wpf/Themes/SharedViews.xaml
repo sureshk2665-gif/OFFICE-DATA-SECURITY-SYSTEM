@@ -1,0 +1,60 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:core="clr-namespace:OfficeSecurity.Client.Core.ViewModels;assembly=OfficeSecurity.Client.Core"
+                    xmlns:ui="clr-namespace:OfficeSecurity.Client.Wpf">
+
+  <!-- Each dictionary merges what it references, so StaticResource lookups never depend on load order. -->
+  <ResourceDictionary.MergedDictionaries>
+    <ResourceDictionary Source="Theme.xaml" />
+  </ResourceDictionary.MergedDictionaries>
+
+  <ui:StatusToBrushConverter x:Key="StatusToBrush" />
+  <ui:LocalTimeConverter x:Key="LocalTime" />
+  <ui:AccountStatusTextConverter x:Key="AccountStatusText" />
+  <ui:QrCodeConverter x:Key="QrCode" />
+
+  <!-- Reusable error / info banners bound to BusyViewModel.ErrorMessage / InfoMessage -->
+  <DataTemplate x:Key="Messages">
+    <StackPanel>
+      <Border Style="{StaticResource Banner.Error}" Visibility="{Binding HasError, Converter={StaticResource BoolToVisibility}}">
+        <TextBlock Text="{Binding ErrorMessage}" Style="{StaticResource Text.Body}" />
+      </Border>
+      <Border Style="{StaticResource Banner.Success}" Visibility="{Binding HasInfo, Converter={StaticResource BoolToVisibility}}">
+        <TextBlock Text="{Binding InfoMessage}" Style="{StaticResource Text.Body}" />
+      </Border>
+    </StackPanel>
+  </DataTemplate>
+
+  <DataTemplate DataType="{x:Type core:ConnectViewModel}">
+    <Grid>
+      <Border Style="{StaticResource Card}" MaxWidth="520" VerticalAlignment="Center" HorizontalAlignment="Center" Padding="28">
+        <StackPanel>
+          <TextBlock Text="Connect to the office server" Style="{StaticResource Text.PageTitle}" />
+          <TextBlock Style="{StaticResource Text.Muted}" Margin="0,0,0,12"
+                     Text="Enter the server address and pairing code. Both are shown when Office Security Server starts, and saved in SERVER-CONNECTION-INFO.txt on the server computer." />
+          <ContentControl Content="{Binding}" ContentTemplate="{StaticResource Messages}" />
+          <TextBlock Text="Server address (for example office-pc or 192.168.1.20)" Style="{StaticResource Text.Label}" />
+          <TextBox Text="{Binding ServerAddress, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource TextBox.Field}" />
+          <TextBlock Text="Pairing code" Style="{StaticResource Text.Label}" />
+          <TextBox Text="{Binding PairingCodeText, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource TextBox.Field}" CharacterCasing="Upper" />
+          <Button Content="Connect" Command="{Binding ConnectCommand}" IsEnabled="{Binding IsNotBusy}" IsDefault="True"
+                  Style="{StaticResource Button.Primary}" HorizontalAlignment="Left" Margin="0,16,0,0" />
+        </StackPanel>
+      </Border>
+    </Grid>
+  </DataTemplate>
+
+  <DataTemplate DataType="{x:Type core:ChangePasswordViewModel}">
+    <StackPanel MaxWidth="420" HorizontalAlignment="Left">
+      <ContentControl Content="{Binding}" ContentTemplate="{StaticResource Messages}" />
+      <TextBlock Text="Current password" Style="{StaticResource Text.Label}" />
+      <PasswordBox ui:PasswordBoxHelper.BoundPassword="{Binding CurrentPassword}" Style="{StaticResource PasswordBox.Field}" />
+      <TextBlock Text="New password (at least 12 characters)" Style="{StaticResource Text.Label}" />
+      <PasswordBox ui:PasswordBoxHelper.BoundPassword="{Binding NewPassword}" Style="{StaticResource PasswordBox.Field}" />
+      <TextBlock Text="Confirm new password" Style="{StaticResource Text.Label}" />
+      <PasswordBox ui:PasswordBoxHelper.BoundPassword="{Binding ConfirmPassword}" Style="{StaticResource PasswordBox.Field}" />
+      <Button Content="Change password" Command="{Binding ChangeCommand}" IsEnabled="{Binding IsNotBusy}"
+              Style="{StaticResource Button.Primary}" HorizontalAlignment="Left" Margin="0,16,0,0" />
+    </StackPanel>
+  </DataTemplate>
+</ResourceDictionary>

@@ -1,35 +1,21 @@
-using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using OfficeSecurity.Client.Core;
+using OfficeSecurity.Client.Core.ViewModels;
 
 namespace OfficeSecurity.AdminDashboard.ViewModels;
 
-public sealed partial class SettingsViewModel : SectionViewModel
+public sealed partial class SettingsViewModel(ShellViewModel shell) : SectionViewModel("Settings")
 {
-    private readonly SettingsService _settings;
+    public string ServerAddress => shell.Settings.ServerAddress;
 
-    public SettingsViewModel(SettingsService settings) : base("Settings")
-    {
-        _settings = settings;
-        ServerAddress = settings.Current.ServerAddress;
-    }
-
-    [ObservableProperty]
-    public partial string ServerAddress { get; set; }
-
-    [ObservableProperty]
-    public partial string Message { get; set; } = string.Empty;
+    public ChangePasswordViewModel ChangePassword { get; } = new(shell.Api) { SessionEnded = shell.SessionEnded };
 
     [RelayCommand]
-    private void Save()
+    private async Task ForgetServerAsync()
     {
-        if (!ClientSettings.TryParseServerAddress(ServerAddress, out var address))
+        if (shell.Ui.Confirm("Change server", "Sign out and disconnect this dashboard from the server? You will need the server address and pairing code to connect again."))
         {
-            Message = "Enter a full address, for example https://office-server:5443";
-            return;
+            await shell.Api.LogoutAsync();
+            shell.ForgetServer();
         }
-
-        _settings.Save(_settings.Current with { ServerAddress = address!.ToString().TrimEnd('/') });
-        Message = "Saved.";
     }
 }

@@ -21,7 +21,7 @@
    - Agents pin the policy public key they receive during enrollment.
    - Agents reject any policy with an invalid signature, a lower version number, or a different computer
      target. They keep enforcing the last valid policy.
-4. **Passwords** are hashed with ASP.NET Core Identity `PasswordHasher` (PBKDF2-HMAC-SHA512, 600,000
+4. **Passwords** are hashed with PBKDF2-HMAC-SHA512 (see ADR-0005 for the final parameters; originally stated as 600,000
    iterations).
    - Admin accounts require TOTP two-step login.
    - Staff credentials are provisioned through one-time set-password codes, so the admin never sees or

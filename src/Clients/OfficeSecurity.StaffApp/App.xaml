@@ -5,7 +5,8 @@
   <Application.Resources>
     <ResourceDictionary>
       <ResourceDictionary.MergedDictionaries>
-        <ResourceDictionary Source="pack://application:,,,/OfficeSecurity.Client.Wpf;component/Themes/Theme.xaml" />
+        <ResourceDictionary Source="pack://application:,,,/OfficeSecurity.Client.Wpf;component/Themes/SharedViews.xaml" />
+        <ResourceDictionary Source="Views/StaffViews.xaml" />
       </ResourceDictionary.MergedDictionaries>
     </ResourceDictionary>
   </Application.Resources>

@@ -1,0 +1,120 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:vm="clr-namespace:OfficeSecurity.AdminDashboard.ViewModels"
+                    xmlns:ui="clr-namespace:OfficeSecurity.Client.Wpf;assembly=OfficeSecurity.Client.Wpf">
+
+  <ResourceDictionary.MergedDictionaries>
+    <ResourceDictionary Source="pack://application:,,,/OfficeSecurity.Client.Wpf;component/Themes/SharedViews.xaml" />
+  </ResourceDictionary.MergedDictionaries>
+
+  <Style x:Key="SignInCard" TargetType="Border" BasedOn="{StaticResource Card}">
+    <Setter Property="MaxWidth" Value="480" />
+    <Setter Property="Padding" Value="28" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+    <Setter Property="HorizontalAlignment" Value="Center" />
+  </Style>
+
+  <DataTemplate DataType="{x:Type vm:FirstSetupViewModel}">
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+      <Border Style="{StaticResource SignInCard}">
+        <StackPanel>
+          <TextBlock Text="First-time setup" Style="{StaticResource Text.PageTitle}" />
+          <TextBlock Style="{StaticResource Text.Muted}" Margin="0,0,0,12"
+                     Text="Create the first administrator account. Use the setup code shown in the server window (also saved in FIRST-ADMIN-SETUP-CODE.txt on the server computer)." />
+          <ContentControl Content="{Binding}" ContentTemplate="{StaticResource Messages}" />
+          <TextBlock Text="Setup code from the server" Style="{StaticResource Text.Label}" />
+          <TextBox Text="{Binding SetupCode, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource TextBox.Field}" CharacterCasing="Upper" />
+          <TextBlock Text="Your user name (letters, digits, dot, dash)" Style="{StaticResource Text.Label}" />
+          <TextBox Text="{Binding Username, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource TextBox.Field}" />
+          <TextBlock Text="Your full name" Style="{StaticResource Text.Label}" />
+          <TextBox Text="{Binding DisplayName, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource TextBox.Field}" />
+          <TextBlock Text="Password (at least 12 characters; a short sentence works well)" Style="{StaticResource Text.Label}" />
+          <PasswordBox ui:PasswordBoxHelper.BoundPassword="{Binding Password}" Style="{StaticResource PasswordBox.Field}" />
+          <TextBlock Text="Confirm password" Style="{StaticResource Text.Label}" />
+          <PasswordBox ui:PasswordBoxHelper.BoundPassword="{Binding ConfirmPassword}" Style="{StaticResource PasswordBox.Field}" />
+          <Button Content="Create administrator" Command="{Binding CreateCommand}" IsEnabled="{Binding IsNotBusy}" IsDefault="True"
+                  Style="{StaticResource Button.Primary}" HorizontalAlignment="Left" Margin="0,16,0,0" />
+        </StackPanel>
+      </Border>
+    </ScrollViewer>
+  </DataTemplate>
+
+  <DataTemplate DataType="{x:Type vm:ActivateAdminViewModel}">
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+      <Border Style="{StaticResource SignInCard}">
+        <StackPanel>
+          <TextBlock Text="Activate administrator account" Style="{StaticResource Text.PageTitle}" />
+          <TextBlock Style="{StaticResource Text.Muted}" Margin="0,0,0,12"
+                     Text="Use the user name and one-time setup code you received from your super administrator." />
+          <ContentControl Content="{Binding}" ContentTemplate="{StaticResource Messages}" />
+          <TextBlock Text="User name" Style="{StaticResource Text.Label}" />
+          <TextBox Text="{Binding Username, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource TextBox.Field}" />
+          <TextBlock Text="Setup code" Style="{StaticResource Text.Label}" />
+          <TextBox Text="{Binding SetupCode, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource TextBox.Field}" CharacterCasing="Upper" />
+          <TextBlock Text="New password (at least 12 characters)" Style="{StaticResource Text.Label}" />
+          <PasswordBox ui:PasswordBoxHelper.BoundPassword="{Binding Password}" Style="{StaticResource PasswordBox.Field}" />
+          <TextBlock Text="Confirm password" Style="{StaticResource Text.Label}" />
+          <PasswordBox ui:PasswordBoxHelper.BoundPassword="{Binding ConfirmPassword}" Style="{StaticResource PasswordBox.Field}" />
+          <StackPanel Orientation="Horizontal" Margin="0,16,0,0">
+            <Button Content="Continue" Command="{Binding ActivateCommand}" IsEnabled="{Binding IsNotBusy}" IsDefault="True" Style="{StaticResource Button.Primary}" />
+            <Button Content="Back to sign-in" Command="{Binding BackCommand}" Style="{StaticResource Button.Secondary}" Margin="8,0,0,0" />
+          </StackPanel>
+        </StackPanel>
+      </Border>
+    </ScrollViewer>
+  </DataTemplate>
+
+  <DataTemplate DataType="{x:Type vm:MfaEnrollmentViewModel}">
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+      <Border Style="{StaticResource SignInCard}" MaxWidth="560">
+        <StackPanel>
+          <TextBlock Text="Set up two-step verification" Style="{StaticResource Text.PageTitle}" />
+          <TextBlock Style="{StaticResource Text.Body}" Margin="0,0,0,12"
+                     Text="1. Install an authenticator app on your phone (Microsoft Authenticator or Google Authenticator).&#x0a;2. In the app, add an account and scan this QR code.&#x0a;3. Enter the 6-digit code the app shows." />
+          <ContentControl Content="{Binding}" ContentTemplate="{StaticResource Messages}" />
+          <Image Source="{Binding OtpAuthUri, Converter={StaticResource QrCode}}" Width="220" Height="220" HorizontalAlignment="Left"
+                 RenderOptions.BitmapScalingMode="NearestNeighbor" />
+          <TextBlock Text="Cannot scan? Enter this key in the app instead:" Style="{StaticResource Text.Label}" />
+          <TextBox Text="{Binding SecretForDisplay, Mode=OneWay}" Style="{StaticResource Text.Code}" FontSize="15" />
+          <TextBlock Text="6-digit code from the app" Style="{StaticResource Text.Label}" />
+          <TextBox Text="{Binding Code, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource TextBox.Field}" MaxLength="7" Width="140" HorizontalAlignment="Left" />
+          <Button Content="Confirm" Command="{Binding ConfirmCommand}" IsEnabled="{Binding IsNotBusy}" IsDefault="True"
+                  Style="{StaticResource Button.Primary}" HorizontalAlignment="Left" Margin="0,16,0,0" />
+        </StackPanel>
+      </Border>
+    </ScrollViewer>
+  </DataTemplate>
+
+  <DataTemplate DataType="{x:Type vm:LoginViewModel}">
+    <Grid>
+      <Border Style="{StaticResource SignInCard}">
+        <StackPanel>
+          <TextBlock Text="Administrator sign-in" Style="{StaticResource Text.PageTitle}" />
+          <TextBlock Text="{Binding ServerAddress, StringFormat='Server: {0}'}" Style="{StaticResource Text.Muted}" Margin="0,0,0,12" />
+          <ContentControl Content="{Binding}" ContentTemplate="{StaticResource Messages}" />
+
+          <StackPanel Visibility="{Binding IsPasswordStep, Converter={StaticResource BoolToVisibility}}">
+            <TextBlock Text="User name" Style="{StaticResource Text.Label}" />
+            <TextBox Text="{Binding Username, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource TextBox.Field}" />
+            <TextBlock Text="Password" Style="{StaticResource Text.Label}" />
+            <PasswordBox ui:PasswordBoxHelper.BoundPassword="{Binding Password}" Style="{StaticResource PasswordBox.Field}" />
+            <Button Content="Next" Command="{Binding SignInCommand}" IsEnabled="{Binding IsNotBusy}" IsDefault="{Binding IsPasswordStep}"
+                    Style="{StaticResource Button.Primary}" HorizontalAlignment="Left" Margin="0,16,0,16" />
+            <Button Content="Activate an invited administrator account" Command="{Binding ActivateCommand}" Style="{StaticResource Button.Link}" Margin="0,0,0,6" />
+            <Button Content="Connect to a different server" Command="{Binding ChangeServerCommand}" Style="{StaticResource Button.Link}" />
+          </StackPanel>
+
+          <StackPanel Visibility="{Binding IsCodeStep, Converter={StaticResource BoolToVisibility}}">
+            <TextBlock Text="Enter the 6-digit code from your authenticator app." Style="{StaticResource Text.Body}" />
+            <TextBlock Text="Code" Style="{StaticResource Text.Label}" />
+            <TextBox Text="{Binding Code, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource TextBox.Field}" MaxLength="7" Width="140" HorizontalAlignment="Left" />
+            <StackPanel Orientation="Horizontal" Margin="0,16,0,0">
+              <Button Content="Sign in" Command="{Binding VerifyCommand}" IsEnabled="{Binding IsNotBusy}" IsDefault="{Binding IsCodeStep}" Style="{StaticResource Button.Primary}" />
+              <Button Content="Start over" Command="{Binding StartOverCommand}" Style="{StaticResource Button.Secondary}" Margin="8,0,0,0" />
+            </StackPanel>
+          </StackPanel>
+        </StackPanel>
+      </Border>
+    </Grid>
+  </DataTemplate>
+</ResourceDictionary>

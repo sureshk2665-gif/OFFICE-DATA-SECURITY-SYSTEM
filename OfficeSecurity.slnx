@@ -12,6 +12,9 @@
   </Folder>
   <Folder Name="/src/Server/">
     <Project Path="src/Server/OfficeSecurity.Server.Api/OfficeSecurity.Server.Api.csproj" />
+    <Project Path="src/Server/OfficeSecurity.Server.Application/OfficeSecurity.Server.Application.csproj" />
+    <Project Path="src/Server/OfficeSecurity.Server.Domain/OfficeSecurity.Server.Domain.csproj" />
+    <Project Path="src/Server/OfficeSecurity.Server.Infrastructure/OfficeSecurity.Server.Infrastructure.csproj" />
   </Folder>
   <Folder Name="/src/Shared/">
     <Project Path="src/Shared/OfficeSecurity.Contracts/OfficeSecurity.Contracts.csproj" />
@@ -22,5 +25,6 @@
     <Project Path="tests/OfficeSecurity.Client.Core.Tests/OfficeSecurity.Client.Core.Tests.csproj" />
     <Project Path="tests/OfficeSecurity.Policy.Tests/OfficeSecurity.Policy.Tests.csproj" />
     <Project Path="tests/OfficeSecurity.Server.IntegrationTests/OfficeSecurity.Server.IntegrationTests.csproj" />
+    <Project Path="tests/OfficeSecurity.Server.UnitTests/OfficeSecurity.Server.UnitTests.csproj" />
   </Folder>
 </Solution>

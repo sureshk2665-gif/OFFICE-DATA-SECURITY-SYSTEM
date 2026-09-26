@@ -3,8 +3,8 @@
 Centralized Windows computer management, file safety and security enforcement for an office LAN.
 There is no screen monitoring, screen recording, screenshots, keystroke logging, webcam or microphone capture.
 
-> **Status: Phase 1 (foundation) complete — development build only.**
-> The applications start and connect to each other. **No security control is enforced yet.**
+> **Status: Phase 2 (secure sign-in, accounts, audit log) complete — development build only.**
+> **No computer security control is enforced yet.** USB, software and file protection arrive in Phases 3–5.
 > Every control is reported as `NotImplemented` until its phase is delivered and tested.
 
 ## Getting the `.exe` files
@@ -28,8 +28,8 @@ Every push is built on a Windows machine by GitHub Actions:
 | Phase | Content | Status |
 |---|---|---|
 | 1 | Architecture, decisions (ADRs), threat model, solution skeleton, signed policy format, CI | **Done** |
-| 2 | Database, admin login + two-step verification, staff accounts, roles, HTTPS | Next |
-| 3 | Computer enrollment, agent heartbeat, policy distribution, offline queue | Planned |
+| 2 | Database, admin sign-in with two-step verification, staff accounts, roles, tamper-evident audit log, pinned HTTPS | **Done** |
+| 3 | Computer enrollment, agent heartbeat, policy distribution, offline queue | Next |
 | 4 | Software inventory, installation requests and approvals, approved deployment | Planned |
 | 5 | USB / device control, application control, network & browser restrictions, file protection | Planned |
 | 6 | Security events, alerts, audit log, reports (CSV/PDF) | Planned |
@@ -40,6 +40,8 @@ Every push is built on a Windows machine by GitHub Actions:
 - [Architecture & implementation plan](docs/00-ARCHITECTURE-AND-PLAN.md)
 - [Decisions (ADRs)](docs/adr/): default assumptions, database, identity & trust, packaging
 - [Threat model](docs/security/threat-model.md)
+- [API reference](docs/api/README.md) · [Database schema](docs/database/schema.md)
+- [Phase 2 test report](docs/testing/phase-2-test-report.md)
 
 ## For developers
 
@@ -53,10 +55,10 @@ but they run only on Windows.
 
 ```
 src/Shared/   Contracts (API DTOs, enums) · Policy (policy model, ECDSA signing & verification)
-src/Server/   OfficeSecurity.Server.Api (ASP.NET Core, Windows Service host)
+src/Server/   Domain (entities) · Application (auth, accounts, audit) · Infrastructure (EF Core/SQLite, CA) · Api (endpoints, Windows Service host)
 src/Agent/    OfficeSecurity.Agent (Windows Service) · Agent.Enforcement (IEnforcer, coordinator)
-src/Clients/  Client.Core (API client, settings) · Client.Wpf (theme) · AdminDashboard · StaffApp
-tests/        Policy, Agent, Client.Core unit tests · Server integration tests
+src/Clients/  Client.Core (API client, pinned TLS, pairing, shared view models) · Client.Wpf (theme, shared views) · AdminDashboard · StaffApp
+tests/        Policy, Agent, Client.Core, Server unit tests · Server integration tests (in-memory and real HTTPS)
 ```
 
-The server's Domain/Application/Infrastructure layers are added in Phase 2, when they get real content.
+Both desktop apps support `--smoke-test <log file>`, which builds every screen off-screen; CI runs it on Windows.
