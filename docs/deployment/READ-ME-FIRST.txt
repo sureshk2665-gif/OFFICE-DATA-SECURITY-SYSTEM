@@ -1,16 +1,17 @@
-OFFICE COMPUTER SECURITY SYSTEM - DEVELOPMENT BUILD (PHASE 2)
+OFFICE COMPUTER SECURITY SYSTEM - DEVELOPMENT BUILD (PHASE 3)
 ==============================================================
 
-IMPORTANT: This build does NOT protect any computer yet. Nothing is blocked.
-Phase 2 adds secure sign-in, staff accounts and the audit log.
-USB, software and file protection come in later phases.
+IMPORTANT: This build does NOT block anything yet. USB, software and file
+protection are switched on in Phase 5. Phase 3 connects office computers:
+you can see every computer, its status, hardware, connected USB/phone/
+Bluetooth devices and events, and send it security policies.
 Use it on test computers only.
 
 Folders in this package
   Server\          OfficeSecurity.Server.exe          Central server (one office PC)
   AdminDashboard\  OfficeSecurity.AdminDashboard.exe  Administrator program
   StaffApp\        OfficeSecurity.StaffApp.exe        Staff program
-  Agent\           OfficeSecurity.Agent.exe           Security agent (not used yet in Phase 2)
+  Agent\           OfficeSecurity.Agent.exe           Security agent (install on every office PC)
 
 You will need: a smartphone with an authenticator app
 (Microsoft Authenticator or Google Authenticator, both free).
@@ -46,9 +47,42 @@ STEP 5 - Staff first sign-in
   and pairing code (a one-time step for each PC).
   Click "First sign-in", enter the employee code, the setup code and a new password.
 
-STEP 6 - Look at the audit log
+STEP 6 - Add an office computer (the security agent)
+  In the dashboard open "Computers" and click "Add computer". It shows a command with
+  a one-time enrollment code (valid 24 hours).
+  On the office computer:
+    a) Copy the Agent folder to it (USB stick or network share).
+    b) Click Start, type "cmd", right-click Command Prompt, choose "Run as administrator".
+    c) Go to the Agent folder (for example: cd C:\Users\you\Desktop\Agent)
+    d) Paste the command from the dashboard and press Enter.
+       It checks the server, installs the "Office Security Agent" service and registers.
+  Back in the dashboard (Computers): the computer shows "PendingApproval".
+  Select it and click "Approve". Within a minute it shows as Online with its details.
+  The agent starts automatically with Windows and restarts itself if it is stopped.
+  Staff (standard Windows users) cannot stop it.
+
+STEP 7 - Staff on that computer
+  Start StaffApp\OfficeSecurity.StaffApp.exe on the approved computer: it connects
+  automatically through the agent (no pairing needed).
+  To restrict a staff member to certain computers: Computers -> select the computer ->
+  tick the staff member under "Staff allowed to sign in on this computer" -> Save.
+
+STEP 8 - Policies and events
+  "Security Policies": edit the default policy or create others and assign them to
+  computers (Computers -> Security policy). Computers receive the signed policy at their
+  next check-in. The controls are not enforced until Phase 5; each computer shows
+  "NotImplemented" for them.
+  "Security Events": everything the computers report. "USB connection log" shows USB
+  drives, phones and Bluetooth devices being connected.
+
+STEP 9 - Look at the audit log
   In the dashboard open "Audit Logs". Every sign-in, failed sign-in and account change is listed.
   Click "Verify integrity" to check that nobody has altered the log.
+
+Removing the agent from a computer (administrator Command Prompt):
+  "C:\Program Files\OfficeSecurity\Agent\OfficeSecurity.Agent.exe" uninstall
+  Then remove the computer in the dashboard (Computers -> Remove from management).
+Checking the agent on a computer:  ...\OfficeSecurity.Agent.exe status
 
 Good to know
   - 5 wrong attempts lock an account for 15 minutes.

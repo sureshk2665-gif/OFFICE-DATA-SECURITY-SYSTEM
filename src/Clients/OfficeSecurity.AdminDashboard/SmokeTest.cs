@@ -85,6 +85,25 @@ internal static class SmokeTest
         });
         Check("Staff read-only", () => new StaffViewModel(shell, canWrite: false));
 
+        var summary = new ComputerSummary(Guid.NewGuid(), "PC-01", ComputerStatuses.Trusted, true, DateTimeOffset.UtcNow, "Windows 11 Pro", "Professional", "0.1.0", "Default policy", 1, 1, 0, DateTimeOffset.UtcNow);
+        var detail = new ComputerDetail(summary,
+            new HardwareInventory("PC-01", "Windows 11 Pro", "24H2", "26100.1", "Professional", "Contoso", "Model", "SN", "CPU", 8192, 256, true, false, "WORKGROUP"),
+            [new ControlStatus(SecurityControl.RemovableStorage, ControlState.NotImplemented, null, DateTimeOffset.UtcNow)],
+            [new DeviceSummary(@"USBSTOR\DISK", "USB drive", "DiskDrive", "Vendor", true, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow)],
+            [new StaffReference(Guid.NewGuid(), "EMP001", "Sample")], null, "192.168.1.5", "ab", DateTimeOffset.UtcNow.AddYears(2));
+        Check("Computers with details and install instructions", () =>
+        {
+            var computers = new ComputersViewModel(shell, canWrite: true);
+            computers.ShowSampleForSelfTest(detail, new EnrollmentCodeResponse("ABCD-EFGH-JKMN", DateTimeOffset.UtcNow.AddDays(1), "1234-5678-9ABC-DEF0-1234"));
+            return computers;
+        });
+        Check("Policy editor", () =>
+        {
+            var policies = new PoliciesViewModel(shell, canWrite: true);
+            policies.NewCommand.Execute(null);
+            return policies;
+        });
+
         log.AppendLine(failures == 0 ? "RESULT: all screens built successfully" : string.Create(CultureInfo.InvariantCulture, $"RESULT: {failures} screen(s) failed"));
         if (!string.IsNullOrEmpty(logPath))
         {

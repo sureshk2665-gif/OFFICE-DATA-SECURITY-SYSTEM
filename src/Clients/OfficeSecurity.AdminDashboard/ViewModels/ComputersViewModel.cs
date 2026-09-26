@@ -99,6 +99,16 @@ public sealed partial class ComputersViewModel(ShellViewModel shell, bool canWri
 
     public override Task ActivateAsync() => LoadAsync();
 
+    /// <summary>Used by the start-up self-test to render the detail panel without a server.</summary>
+    internal void ShowSampleForSelfTest(ComputerDetail detail, EnrollmentCodeResponse enrollment)
+    {
+        Detail = detail;
+        Enrollment = enrollment;
+        RecentEvents.Add(new SecurityEventResponse(1, detail.Summary.Id, detail.Summary.Hostname, "DeviceConnected", EventSeverities.Information, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, "sample"));
+        PolicyChoices.Add(new PolicyChoice(null, "Default policy (default)"));
+        StaffChoices.Add(new StaffChoice(new StaffSummary(Guid.NewGuid(), "EMP001", "Sample", null, AccountStatuses.Active, DateTimeOffset.UtcNow, null, false), true));
+    }
+
     [RelayCommand]
     private Task LoadAsync() => RunAsync(FetchAsync);
 

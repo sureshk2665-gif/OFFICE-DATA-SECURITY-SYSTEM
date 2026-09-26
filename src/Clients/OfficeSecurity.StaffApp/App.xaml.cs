@@ -25,7 +25,7 @@ public partial class App : Application
         var window = new MainWindow { DataContext = shell };
         MainWindow = window;
         window.Show();
-        shell.Start();
+        _ = shell.StartAsync();
     }
 
     private void OnUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)

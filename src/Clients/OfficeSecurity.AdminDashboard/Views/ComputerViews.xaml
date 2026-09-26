@@ -1,0 +1,309 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:vm="clr-namespace:OfficeSecurity.AdminDashboard.ViewModels">
+
+  <ResourceDictionary.MergedDictionaries>
+    <ResourceDictionary Source="pack://application:,,,/OfficeSecurity.Client.Wpf;component/Themes/SharedViews.xaml" />
+  </ResourceDictionary.MergedDictionaries>
+
+  <!-- ============================== computers ============================== -->
+  <DataTemplate DataType="{x:Type vm:ComputersViewModel}">
+    <StackPanel>
+      <TextBlock Text="Computers" Style="{StaticResource Text.PageTitle}" />
+      <ContentControl Content="{Binding}" ContentTemplate="{StaticResource Messages}" />
+
+      <!-- Add computer: install instructions with the one-time enrollment code -->
+      <Border Style="{StaticResource Banner.Success}" Visibility="{Binding HasEnrollment, Converter={StaticResource BoolToVisibility}}">
+        <StackPanel>
+          <TextBlock Text="Add a computer" Style="{StaticResource Text.SectionTitle}" />
+          <TextBlock Style="{StaticResource Text.Body}" TextWrapping="Wrap"
+                     Text="1. Copy the Agent folder to the computer.   2. Open Command Prompt as administrator in that folder.   3. Run this command:" />
+          <TextBox Text="{Binding InstallCommand, Mode=OneWay}" IsReadOnly="True" FontFamily="Consolas" FontSize="13" TextWrapping="Wrap" Margin="0,8,0,8" Padding="6" />
+          <TextBlock Style="{StaticResource Text.Muted}" TextWrapping="Wrap">
+            <Run Text="The enrollment code works once and expires on " /><Run Text="{Binding Enrollment.ExpiresAtUtc, Mode=OneWay, Converter={StaticResource LocalTime}}" /><Run Text=". The computer then appears below as 'Waiting for approval'." />
+          </TextBlock>
+          <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+            <Button Content="Copy command" Command="{Binding CopyInstallCommandCommand}" Style="{StaticResource Button.Primary}" />
+            <Button Content="Done" Command="{Binding DismissEnrollmentCommand}" Style="{StaticResource Button.Secondary}" Margin="8,0,0,0" />
+          </StackPanel>
+        </StackPanel>
+      </Border>
+
+      <Border Style="{StaticResource Card}">
+        <StackPanel>
+          <DockPanel Margin="0,0,0,12">
+            <Button DockPanel.Dock="Right" Content="Add computer" Command="{Binding AddComputerCommand}" Style="{StaticResource Button.Primary}"
+                    Visibility="{Binding CanWrite, Converter={StaticResource BoolToVisibility}}" />
+            <StackPanel Orientation="Horizontal">
+              <TextBox Text="{Binding Search, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource TextBox.Field}" Width="220" ToolTip="Search by computer name or Windows version" />
+              <ComboBox ItemsSource="{Binding StatusFilters}" SelectedItem="{Binding StatusFilter}" Width="190" Margin="8,0,0,0" VerticalContentAlignment="Center" />
+              <Button Content="Search" Command="{Binding ApplyFilterCommand}" IsDefault="True" Style="{StaticResource Button.Secondary}" Margin="8,0,0,0" />
+              <Button Content="Refresh" Command="{Binding LoadCommand}" Style="{StaticResource Button.Secondary}" Margin="8,0,0,0" />
+            </StackPanel>
+          </DockPanel>
+
+          <DataGrid ItemsSource="{Binding Items}" SelectedItem="{Binding Selected}" Style="{StaticResource Grid.Table}" MinHeight="200" MaxHeight="360">
+            <DataGrid.Columns>
+              <DataGridTextColumn Header="Computer" Binding="{Binding Hostname}" Width="150" />
+              <DataGridTextColumn Header="Status" Binding="{Binding Status}" Width="130" />
+              <DataGridCheckBoxColumn Header="Online" Binding="{Binding IsOnline}" Width="60" />
+              <DataGridTextColumn Header="Last seen" Binding="{Binding LastSeenAtUtc, Converter={StaticResource LocalTime}}" Width="140" />
+              <DataGridTextColumn Header="Windows" Binding="{Binding OsName}" Width="*" />
+              <DataGridTextColumn Header="Policy" Binding="{Binding PolicyName}" Width="150" />
+              <DataGridTextColumn Header="Policy version (applied/latest)" Width="120">
+                <DataGridTextColumn.Binding>
+                  <MultiBinding StringFormat="{}{0} / {1}" Mode="OneWay">
+                    <Binding Path="AppliedPolicyVersion" />
+                    <Binding Path="LatestPolicyVersion" />
+                  </MultiBinding>
+                </DataGridTextColumn.Binding>
+              </DataGridTextColumn>
+              <DataGridTextColumn Header="Failed controls" Binding="{Binding FailedControls}" Width="90" />
+            </DataGrid.Columns>
+          </DataGrid>
+
+          <DockPanel Margin="0,12,0,0">
+            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+              <Button Content="Previous" Command="{Binding PreviousPageCommand}" Style="{StaticResource Button.Secondary}" />
+              <Button Content="Next" Command="{Binding NextPageCommand}" Style="{StaticResource Button.Secondary}" Margin="8,0,0,0" />
+            </StackPanel>
+            <TextBlock Text="{Binding PageText}" Style="{StaticResource Text.Muted}" VerticalAlignment="Center" />
+          </DockPanel>
+
+          <StackPanel Orientation="Horizontal" Margin="0,16,0,0" Visibility="{Binding CanWrite, Converter={StaticResource BoolToVisibility}}">
+            <Button Content="Approve" Command="{Binding ApproveCommand}" Style="{StaticResource Button.Primary}" IsEnabled="{Binding IsSelectedPending}" />
+            <Button Content="Reject" Command="{Binding RejectCommand}" Style="{StaticResource Button.Secondary}" IsEnabled="{Binding IsSelectedPending}" Margin="8,0,0,0" />
+            <Button Content="Remove from management" Command="{Binding RetireCommand}" Style="{StaticResource Button.Danger}" IsEnabled="{Binding IsSelectedTrusted}" Margin="8,0,0,0" />
+          </StackPanel>
+        </StackPanel>
+      </Border>
+
+      <!-- Details of the selected computer -->
+      <StackPanel Visibility="{Binding HasDetail, Converter={StaticResource BoolToVisibility}}">
+        <Border Style="{StaticResource Card}">
+          <StackPanel>
+            <TextBlock Style="{StaticResource Text.SectionTitle}">
+              <Run Text="{Binding Detail.Summary.Hostname, Mode=OneWay}" /><Run Text=" — computer details" />
+            </TextBlock>
+            <TextBlock Text="{Binding HardwareText}" Style="{StaticResource Text.Body}" />
+          </StackPanel>
+        </Border>
+
+        <Border Style="{StaticResource Card}">
+          <StackPanel>
+            <TextBlock Text="Security controls reported by the agent" Style="{StaticResource Text.SectionTitle}" />
+            <TextBlock Style="{StaticResource Text.Muted}" Margin="0,0,0,8" TextWrapping="Wrap"
+                       Text="Each control shows its verified state on this computer. 'NotImplemented' means the protection is not built yet (Phase 5); nothing is blocked until a control shows 'Enforced'." />
+            <ItemsControl ItemsSource="{Binding Detail.Controls}">
+              <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                  <UniformGrid Columns="3" />
+                </ItemsPanelTemplate>
+              </ItemsControl.ItemsPanel>
+              <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                  <TextBlock Style="{StaticResource Text.Body}" Margin="0,2">
+                    <Run Text="{Binding Control, Mode=OneWay}" FontWeight="SemiBold" /><Run Text=": " /><Run Text="{Binding State, Mode=OneWay}" />
+                  </TextBlock>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </StackPanel>
+        </Border>
+
+        <Border Style="{StaticResource Card}">
+          <StackPanel>
+            <TextBlock Text="USB storage, phones and Bluetooth devices seen on this computer" Style="{StaticResource Text.SectionTitle}" />
+            <DataGrid ItemsSource="{Binding Detail.Devices}" Style="{StaticResource Grid.Table}" MinHeight="80" MaxHeight="240">
+              <DataGrid.Columns>
+                <DataGridTextColumn Header="Device" Binding="{Binding Name}" Width="*" />
+                <DataGridTextColumn Header="Type" Binding="{Binding DeviceClass}" Width="100" />
+                <DataGridCheckBoxColumn Header="Connected" Binding="{Binding IsConnected}" Width="80" />
+                <DataGridTextColumn Header="First seen" Binding="{Binding FirstSeenUtc, Converter={StaticResource LocalTime}}" Width="140" />
+                <DataGridTextColumn Header="Last seen" Binding="{Binding LastSeenUtc, Converter={StaticResource LocalTime}}" Width="140" />
+                <DataGridTextColumn Header="Hardware ID" Binding="{Binding InstanceId}" Width="260" />
+              </DataGrid.Columns>
+            </DataGrid>
+          </StackPanel>
+        </Border>
+
+        <Border Style="{StaticResource Card}">
+          <StackPanel>
+            <TextBlock Text="Security policy" Style="{StaticResource Text.SectionTitle}" />
+            <StackPanel Orientation="Horizontal">
+              <ComboBox ItemsSource="{Binding PolicyChoices}" SelectedItem="{Binding SelectedPolicy}" DisplayMemberPath="Name" Width="300" IsEnabled="{Binding CanWrite}" />
+              <Button Content="Assign policy" Command="{Binding SavePolicyCommand}" Style="{StaticResource Button.Primary}" Margin="8,0,0,0"
+                      Visibility="{Binding CanWrite, Converter={StaticResource BoolToVisibility}}" />
+            </StackPanel>
+          </StackPanel>
+        </Border>
+
+        <Border Style="{StaticResource Card}">
+          <StackPanel>
+            <TextBlock Text="Staff allowed to sign in on this computer" Style="{StaticResource Text.SectionTitle}" />
+            <TextBlock Style="{StaticResource Text.Muted}" Margin="0,0,0,8" TextWrapping="Wrap"
+                       Text="Ticked staff can use the staff application only on the computers assigned to them. Staff not assigned to any computer are not restricted." />
+            <ItemsControl ItemsSource="{Binding StaffChoices}" MaxHeight="220">
+              <ItemsControl.Template>
+                <ControlTemplate TargetType="ItemsControl">
+                  <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <ItemsPresenter />
+                  </ScrollViewer>
+                </ControlTemplate>
+              </ItemsControl.Template>
+              <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                  <CheckBox Content="{Binding Label}" IsChecked="{Binding IsSelected}" Margin="0,2" />
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <Button Content="Save staff assignment" Command="{Binding SaveStaffCommand}" Style="{StaticResource Button.Primary}" HorizontalAlignment="Left" Margin="0,8,0,0"
+                    Visibility="{Binding CanWrite, Converter={StaticResource BoolToVisibility}}" />
+          </StackPanel>
+        </Border>
+
+        <Border Style="{StaticResource Card}">
+          <StackPanel>
+            <TextBlock Text="Recent events from this computer" Style="{StaticResource Text.SectionTitle}" />
+            <DataGrid ItemsSource="{Binding RecentEvents}" Style="{StaticResource Grid.Table}" MinHeight="80" MaxHeight="300">
+              <DataGrid.Columns>
+                <DataGridTextColumn Header="Time" Binding="{Binding OccurredAtUtc, Converter={StaticResource LocalTime}, ConverterParameter='dd MMM yyyy HH:mm:ss'}" Width="160" />
+                <DataGridTextColumn Header="Event" Binding="{Binding EventType}" Width="170" />
+                <DataGridTextColumn Header="Severity" Binding="{Binding Severity}" Width="90" />
+                <DataGridTextColumn Header="Details" Binding="{Binding Details}" Width="*" />
+              </DataGrid.Columns>
+            </DataGrid>
+          </StackPanel>
+        </Border>
+      </StackPanel>
+    </StackPanel>
+  </DataTemplate>
+
+  <!-- ============================== security policies ============================== -->
+  <DataTemplate DataType="{x:Type vm:PoliciesViewModel}">
+    <StackPanel>
+      <TextBlock Text="Security Policies" Style="{StaticResource Text.PageTitle}" />
+      <Border Style="{StaticResource Banner.Info}">
+        <TextBlock Style="{StaticResource Text.Body}" TextWrapping="Wrap"
+                   Text="Policies are signed and delivered to computers now. The Windows protections they switch on are built in Phase 5: until then computers report each control as 'Not implemented' and nothing is blocked." />
+      </Border>
+      <ContentControl Content="{Binding}" ContentTemplate="{StaticResource Messages}" />
+
+      <Border Style="{StaticResource Card}">
+        <StackPanel>
+          <DockPanel Margin="0,0,0,12">
+            <Button DockPanel.Dock="Right" Content="New policy" Command="{Binding NewCommand}" Style="{StaticResource Button.Primary}"
+                    Visibility="{Binding CanWrite, Converter={StaticResource BoolToVisibility}}" />
+            <TextBlock Text="Select a policy to view or edit it. The default policy applies to every computer without another policy." Style="{StaticResource Text.Muted}" VerticalAlignment="Center" TextWrapping="Wrap" />
+          </DockPanel>
+          <DataGrid ItemsSource="{Binding Items}" SelectedItem="{Binding Selected}" Style="{StaticResource Grid.Table}" MinHeight="120" MaxHeight="260">
+            <DataGrid.Columns>
+              <DataGridTextColumn Header="Policy" Binding="{Binding Name}" Width="*" />
+              <DataGridCheckBoxColumn Header="Default" Binding="{Binding IsDefault}" Width="70" />
+              <DataGridTextColumn Header="Computers" Binding="{Binding ComputerCount}" Width="90" />
+              <DataGridTextColumn Header="Revision" Binding="{Binding Revision}" Width="80" />
+              <DataGridTextColumn Header="Last changed" Binding="{Binding UpdatedAtUtc, Converter={StaticResource LocalTime}}" Width="150" />
+            </DataGrid.Columns>
+          </DataGrid>
+        </StackPanel>
+      </Border>
+
+      <Border Style="{StaticResource Card}" Visibility="{Binding IsEditing, Converter={StaticResource BoolToVisibility}}">
+        <StackPanel IsEnabled="{Binding CanWrite}">
+          <TextBlock Text="{Binding EditorTitle}" Style="{StaticResource Text.SectionTitle}" />
+          <Grid>
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="*" />
+              <ColumnDefinition Width="24" />
+              <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <StackPanel Grid.Column="0">
+              <TextBlock Text="Name" Style="{StaticResource Text.Label}" />
+              <TextBox Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource TextBox.Field}" />
+              <TextBlock Text="Description" Style="{StaticResource Text.Label}" />
+              <TextBox Text="{Binding Description, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource TextBox.Field}" />
+              <TextBlock Text="Check-in interval (seconds, 15–3600)" Style="{StaticResource Text.Label}" />
+              <TextBox Text="{Binding HeartbeatSeconds, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource TextBox.Field}" Width="120" HorizontalAlignment="Left" />
+
+              <TextBlock Text="USB storage and external disks" Style="{StaticResource Text.SectionTitle}" Margin="0,16,0,4" />
+              <ComboBox ItemsSource="{Binding EnforcementModes}" SelectedItem="{Binding RemovableStorageMode}" Width="160" HorizontalAlignment="Left" />
+              <CheckBox Content="Also block phones and cameras (file transfer)" IsChecked="{Binding BlockPortableDevices}" Margin="0,6,0,0" />
+              <CheckBox Content="Also block CD/DVD drives" IsChecked="{Binding BlockOpticalDrives}" Margin="0,4,0,0" />
+
+              <TextBlock Text="Bluetooth" Style="{StaticResource Text.SectionTitle}" Margin="0,16,0,4" />
+              <ComboBox ItemsSource="{Binding BluetoothModes}" SelectedItem="{Binding BluetoothMode}" Width="200" HorizontalAlignment="Left" />
+
+              <TextBlock Text="Unapproved programs" Style="{StaticResource Text.SectionTitle}" Margin="0,16,0,4" />
+              <ComboBox ItemsSource="{Binding EnforcementModes}" SelectedItem="{Binding ApplicationControlMode}" Width="160" HorizontalAlignment="Left" />
+              <CheckBox Content="Block programs started from Downloads, AppData and other user folders" IsChecked="{Binding BlockUserWritableLocations}" Margin="0,6,0,0" />
+            </StackPanel>
+
+            <StackPanel Grid.Column="2">
+              <TextBlock Text="Web browsers" Style="{StaticResource Text.SectionTitle}" Margin="0,8,0,4" />
+              <CheckBox Content="Disable private/incognito browsing" IsChecked="{Binding DisablePrivateBrowsing}" />
+              <TextBlock Text="Blocked websites (one per line, e.g. wetransfer.com)" Style="{StaticResource Text.Label}" />
+              <TextBox Text="{Binding BlockedUrls, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True" Height="70" VerticalScrollBarVisibility="Auto" />
+              <TextBlock Text="Allowed websites (one per line)" Style="{StaticResource Text.Label}" />
+              <TextBox Text="{Binding AllowedUrls, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True" Height="70" VerticalScrollBarVisibility="Auto" />
+
+              <TextBlock Text="Network" Style="{StaticResource Text.SectionTitle}" Margin="0,16,0,4" />
+              <TextBlock Text="Allowed Wi-Fi networks (one per line; empty = any)" Style="{StaticResource Text.Label}" />
+              <TextBox Text="{Binding AllowedWifiNetworks, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True" Height="50" VerticalScrollBarVisibility="Auto" />
+              <TextBlock Text="Programs without internet access (full path, one per line)" Style="{StaticResource Text.Label}" />
+              <TextBox Text="{Binding BlockedApplications, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True" Height="50" VerticalScrollBarVisibility="Auto" />
+
+              <TextBlock Text="Company folders" Style="{StaticResource Text.SectionTitle}" Margin="0,16,0,4" />
+              <TextBlock Text="Protected folders (full path, one per line, e.g. D:\Company)" Style="{StaticResource Text.Label}" />
+              <TextBox Text="{Binding ProtectedFolders, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True" Height="50" VerticalScrollBarVisibility="Auto" />
+              <CheckBox Content="Record who opens files in these folders" IsChecked="{Binding AuditProtectedFolders}" Margin="0,6,0,0" />
+              <CheckBox Content="Ransomware protection (Windows Controlled Folder Access)" IsChecked="{Binding RansomwareProtection}" Margin="0,4,0,0" />
+            </StackPanel>
+          </Grid>
+          <TextBlock Style="{StaticResource Text.Muted}" Margin="0,12,0,0" TextWrapping="Wrap"
+                     Text="Modes: Off = not managed · Audit = record only, do not block · Enforce = block and record." />
+          <StackPanel Orientation="Horizontal" Margin="0,16,0,0">
+            <Button Content="Save policy" Command="{Binding SaveCommand}" IsEnabled="{Binding IsNotBusy}" Style="{StaticResource Button.Primary}" />
+            <Button Content="Delete policy" Command="{Binding DeleteCommand}" Style="{StaticResource Button.Danger}" Margin="8,0,0,0"
+                    Visibility="{Binding CanDelete, Converter={StaticResource BoolToVisibility}}" />
+          </StackPanel>
+        </StackPanel>
+      </Border>
+    </StackPanel>
+  </DataTemplate>
+
+  <!-- ============================== security events ============================== -->
+  <DataTemplate DataType="{x:Type vm:EventsViewModel}">
+    <StackPanel>
+      <TextBlock Text="Security Events" Style="{StaticResource Text.PageTitle}" />
+      <ContentControl Content="{Binding}" ContentTemplate="{StaticResource Messages}" />
+      <Border Style="{StaticResource Card}">
+        <StackPanel>
+          <DockPanel Margin="0,0,0,12">
+            <Button DockPanel.Dock="Right" Content="USB connection log" Command="{Binding UsbLogCommand}" Style="{StaticResource Button.Primary}" />
+            <StackPanel Orientation="Horizontal">
+              <TextBox Text="{Binding Search, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource TextBox.Field}" Width="260" ToolTip="Search by event, computer or details" />
+              <Button Content="Search" Command="{Binding ApplyFilterCommand}" IsDefault="True" Style="{StaticResource Button.Secondary}" Margin="8,0,0,0" />
+            </StackPanel>
+          </DockPanel>
+          <DataGrid ItemsSource="{Binding Items}" Style="{StaticResource Grid.Table}" MinHeight="300" MaxHeight="600">
+            <DataGrid.Columns>
+              <DataGridTextColumn Header="Time" Binding="{Binding OccurredAtUtc, Converter={StaticResource LocalTime}, ConverterParameter='dd MMM yyyy HH:mm:ss'}" Width="160" />
+              <DataGridTextColumn Header="Computer" Binding="{Binding ComputerName}" Width="130" />
+              <DataGridTextColumn Header="Event" Binding="{Binding EventType}" Width="170" />
+              <DataGridTextColumn Header="Severity" Binding="{Binding Severity}" Width="90" />
+              <DataGridTextColumn Header="Details" Binding="{Binding Details}" Width="*" />
+            </DataGrid.Columns>
+          </DataGrid>
+          <DockPanel Margin="0,12,0,0">
+            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+              <Button Content="Previous" Command="{Binding PreviousPageCommand}" Style="{StaticResource Button.Secondary}" />
+              <Button Content="Next" Command="{Binding NextPageCommand}" Style="{StaticResource Button.Secondary}" Margin="8,0,0,0" />
+            </StackPanel>
+            <TextBlock Text="{Binding PageText}" Style="{StaticResource Text.Muted}" VerticalAlignment="Center" />
+          </DockPanel>
+        </StackPanel>
+      </Border>
+    </StackPanel>
+  </DataTemplate>
+</ResourceDictionary>

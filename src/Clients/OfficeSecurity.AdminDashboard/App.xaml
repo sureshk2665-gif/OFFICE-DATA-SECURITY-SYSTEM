@@ -8,6 +8,7 @@
         <ResourceDictionary Source="pack://application:,,,/OfficeSecurity.Client.Wpf;component/Themes/SharedViews.xaml" />
         <ResourceDictionary Source="Views/SignInViews.xaml" />
         <ResourceDictionary Source="Views/WorkspaceViews.xaml" />
+        <ResourceDictionary Source="Views/ComputerViews.xaml" />
       </ResourceDictionary.MergedDictionaries>
     </ResourceDictionary>
   </Application.Resources>

@@ -1,4 +1,4 @@
-# Database schema (Phase 2)
+# Database schema (Phases 2–3)
 
 ## Storage
 
@@ -15,7 +15,13 @@
 | `admin_accounts` | Administrators: user name, role, status, PBKDF2 password hash, encrypted TOTP secret, lockout counters | Unique `NormalizedUsername` |
 | `staff_accounts` | Staff: employee code, name, department, status, PBKDF2 password hash, lockout counters | Unique `NormalizedEmployeeCode`; indexes on `Status`, `DisplayName` |
 | `account_setup_codes` | One-time setup/bootstrap codes (SHA-256 hash only), expiry, used/revoked time | Index (`AccountType`, `AccountId`), index `CodeHash` |
-| `sessions` | Signed-in sessions (SHA-256 of token), last seen, expiry, end reason, source IP | Unique `TokenHash`; index (`PrincipalType`, `PrincipalId`) |
+| `sessions` | Signed-in sessions (SHA-256 of token), last seen, expiry, end reason, source IP, computer (staff) | Unique `TokenHash`; index (`PrincipalType`, `PrincipalId`) |
+| `computers` | Enrolled computers: status (PendingApproval, Trusted, Rejected, Retired), certificate thumbprint, last seen, inventory JSON, control status JSON, assigned policy, per-computer policy version | Unique `CertificateThumbprint`; indexes on `Status`, `Hostname`; FK `PolicyId` → policies |
+| `enrollment_codes` | One-time computer enrollment codes (hash only) | Unique `CodeHash` |
+| `device_inventory` | Removable/phone/Bluetooth devices per computer, first/last seen, connected flag | Unique (`ComputerId`, `InstanceId`) |
+| `security_events` | Events uploaded by agents | Unique (`ComputerId`, `EventId`) for idempotent uploads; indexes by computer/time and type/time |
+| `policies` | Named policies; `SettingsJson` holds `PolicySettings`; one `IsDefault` | Unique `Name` |
+| `staff_computer_assignments` | Which staff may sign in on which computers | PK (`StaffId`, `ComputerId`) |
 | `audit_log` | Append-only, hash-chained audit trail | Triggers `audit_log_no_update` / `audit_log_no_delete` reject changes; indexes on `OccurredAtUtc`, `Action` |
 
 ## Audit hash chain

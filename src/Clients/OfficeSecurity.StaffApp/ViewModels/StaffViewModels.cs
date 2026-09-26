@@ -31,7 +31,33 @@ public sealed partial class StaffShellViewModel : ObservableObject
 
     internal void AttachApiForSelfTest(ApiClient api) => _api = api;
 
-    public void Start()
+    /// <summary>True when connected through the approved security agent on this computer.</summary>
+    public bool ConnectedViaAgent { get; private set; }
+
+    /// <summary>
+    /// On an approved office computer the staff application uses the agent's server connection, so no
+    /// pairing is needed and sign-ins can be tied to this computer. Otherwise it falls back to pairing.
+    /// </summary>
+    public async Task StartAsync()
+    {
+        var agent = await AgentLocalClient.TryGetStatusAsync();
+        if (agent is { State: "Enrolled", ServerAddress: { } address, CaCertificateBase64: { } ca })
+        {
+            ConnectedViaAgent = true;
+            _settings = new ClientSettings { ServerAddress = address, CaCertificateBase64 = ca };
+            _api?.Dispose();
+            _api = ApiClient.FromSettings(_settings);
+            ShowLogin(info: "Connected to the office server through this computer's security agent.");
+            return;
+        }
+
+        Start(agent is null ? null : $"This computer's security agent reports: {agent.Message}");
+    }
+
+    /// <summary>Asks the agent for a ticket proving this sign-in happens on this computer (null without an agent).</summary>
+    public async Task<string?> GetComputerTicketAsync() => ConnectedViaAgent ? await AgentLocalClient.TryGetLoginTicketAsync() : null;
+
+    public void Start(string? notice = null)
     {
         if (!_settings.IsPaired)
         {
@@ -40,13 +66,14 @@ public sealed partial class StaffShellViewModel : ObservableObject
             {
                 _settings = settings;
                 Start();
-            });
+            })
+            { InfoMessage = notice ?? string.Empty };
             return;
         }
 
         _api?.Dispose();
         _api = ApiClient.FromSettings(_settings);
-        ShowLogin();
+        ShowLogin(info: notice);
     }
 
     public void ShowLogin(string? info = null, string? error = null) =>
@@ -77,7 +104,7 @@ public sealed partial class StaffLoginViewModel(StaffShellViewModel shell) : Bus
     private Task SignInAsync() => RunAsync(async () =>
     {
         InfoMessage = string.Empty;
-        var user = await shell.Api.StaffLoginAsync(new StaffLoginRequest(EmployeeCode, Password));
+        var user = await shell.Api.StaffLoginAsync(new StaffLoginRequest(EmployeeCode, Password, await shell.GetComputerTicketAsync()));
         Password = string.Empty;
         shell.ShowHome(user);
     });
@@ -110,7 +137,7 @@ public sealed partial class StaffActivateViewModel(StaffShellViewModel shell) : 
             return;
         }
 
-        var user = await shell.Api.StaffActivateAsync(new StaffActivateRequest(EmployeeCode, SetupCode, Password));
+        var user = await shell.Api.StaffActivateAsync(new StaffActivateRequest(EmployeeCode, SetupCode, Password, await shell.GetComputerTicketAsync()));
         shell.ShowHome(user);
     });
 

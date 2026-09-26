@@ -41,7 +41,7 @@ public sealed partial class WorkspaceViewModel : ObservableObject
         var sections = new List<SectionViewModel>
         {
             new OverviewViewModel(shell),
-            new PlannedSectionViewModel("Computers", 3, "Register office computers, see online/offline status, agent health and applied policy."),
+            new ComputersViewModel(shell, canWrite),
             new StaffViewModel(shell, canWrite),
         };
         if (user.Role == AdminRoles.SuperAdmin)
@@ -51,11 +51,12 @@ public sealed partial class WorkspaceViewModel : ObservableObject
 
         sections.AddRange(
         [
-            new PlannedSectionViewModel("Security Policies", 3, "Create security policies and apply them to all or selected computers."),
+            new PoliciesViewModel(shell, canWrite),
             new PlannedSectionViewModel("USB Device Control", 5, "Block removable storage and phones; approve specific USB devices by hardware ID."),
             new PlannedSectionViewModel("Software Management", 4, "Software inventory of every computer and the list of approved applications."),
             new PlannedSectionViewModel("Installation Requests", 4, "Review, approve or reject software requests from staff; deploy approved software."),
             new PlannedSectionViewModel("File Safety", 5, "Protected company folders, file access auditing, and backup status."),
+            new EventsViewModel(shell),
             new PlannedSectionViewModel("Security Alerts", 6, "Alerts for blocked devices, failed logins, stopped agents and policy violations."),
             new AuditViewModel(shell),
             new PlannedSectionViewModel("Reports", 6, "USB, blocked transfer, software, login and weekly/monthly security reports (CSV/PDF)."),

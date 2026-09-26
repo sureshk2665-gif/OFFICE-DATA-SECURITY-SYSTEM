@@ -23,7 +23,7 @@
         <StackPanel DockPanel.Dock="Bottom" Margin="20,12,20,16">
           <TextBlock Text="{Binding UserText}" Foreground="{StaticResource Brush.SidebarText}" FontSize="12" TextWrapping="Wrap" Margin="0,0,0,8" />
           <Button Content="Sign out" Command="{Binding SignOutCommand}" Style="{StaticResource Button.Secondary}" HorizontalAlignment="Left" />
-          <TextBlock Text="Development build · Phase 2" Foreground="{StaticResource Brush.SidebarText}" FontSize="11" Margin="0,12,0,0" />
+          <TextBlock Text="Development build · Phase 3" Foreground="{StaticResource Brush.SidebarText}" FontSize="11" Margin="0,12,0,0" />
         </StackPanel>
         <ListBox Style="{StaticResource NavList}" ItemsSource="{Binding Sections}" SelectedItem="{Binding SelectedSection}" DisplayMemberPath="Title" />
       </DockPanel>
@@ -74,11 +74,39 @@
           </StackPanel>
         </Border>
       </UniformGrid>
+      <UniformGrid Columns="4">
+        <Border Style="{StaticResource Card}" Margin="0,0,12,16">
+          <StackPanel>
+            <TextBlock Text="Approved computers" Style="{StaticResource Text.Muted}" />
+            <TextBlock Text="{Binding Overview.ComputersTrusted, FallbackValue=—}" FontSize="30" FontWeight="SemiBold" />
+          </StackPanel>
+        </Border>
+        <Border Style="{StaticResource Card}" Margin="0,0,12,16">
+          <StackPanel>
+            <TextBlock Text="Online / offline" Style="{StaticResource Text.Muted}" />
+            <TextBlock FontSize="30" FontWeight="SemiBold">
+              <Run Text="{Binding Overview.ComputersOnline, Mode=OneWay, FallbackValue=—}" /><Run Text=" / " /><Run Text="{Binding Overview.ComputersOffline, Mode=OneWay, FallbackValue=—}" />
+            </TextBlock>
+          </StackPanel>
+        </Border>
+        <Border Style="{StaticResource Card}" Margin="0,0,12,16">
+          <StackPanel>
+            <TextBlock Text="Waiting for approval" Style="{StaticResource Text.Muted}" />
+            <TextBlock Text="{Binding Overview.ComputersPendingApproval, FallbackValue=—}" FontSize="30" FontWeight="SemiBold" />
+          </StackPanel>
+        </Border>
+        <Border Style="{StaticResource Card}" Margin="0,0,0,16">
+          <StackPanel>
+            <TextBlock Text="With failed security controls" Style="{StaticResource Text.Muted}" />
+            <TextBlock Text="{Binding Overview.ComputersWithFailedControls, FallbackValue=—}" FontSize="30" FontWeight="SemiBold" />
+          </StackPanel>
+        </Border>
+      </UniformGrid>
       <Border Style="{StaticResource Card}">
         <StackPanel>
-          <TextBlock Text="Computers, alerts and blocked transfers" Style="{StaticResource Text.SectionTitle}" />
-          <TextBlock Style="{StaticResource Text.Muted}"
-                     Text="These figures appear once computers are registered with the security agent (Phase 3 onwards). The dashboard never shows sample or estimated figures." />
+          <TextBlock Text="Alerts and blocked transfers" Style="{StaticResource Text.SectionTitle}" />
+          <TextBlock Style="{StaticResource Text.Muted}" TextWrapping="Wrap"
+                     Text="Blocking starts in Phase 5 and alerts in Phase 6. The dashboard never shows sample or estimated figures." />
         </StackPanel>
       </Border>
     </StackPanel>
