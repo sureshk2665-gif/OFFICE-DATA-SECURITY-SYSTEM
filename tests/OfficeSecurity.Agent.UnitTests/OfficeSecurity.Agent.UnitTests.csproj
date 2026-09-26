@@ -8,12 +8,13 @@
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
     <PackageReference Include="xunit" />
     <PackageReference Include="xunit.runner.visualstudio" />
+    <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" />
 
   </ItemGroup>
   <ItemGroup>
     <Using Include="Xunit" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="../../src/Agent/OfficeSecurity.Agent.Enforcement/OfficeSecurity.Agent.Enforcement.csproj" />
+    <ProjectReference Include="../../src/Agent/OfficeSecurity.Agent.Core/OfficeSecurity.Agent.Core.csproj" />
   </ItemGroup>
 </Project>

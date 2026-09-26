@@ -17,5 +17,6 @@
   <ItemGroup>
     <ProjectReference Include="../../src/Server/OfficeSecurity.Server.Api/OfficeSecurity.Server.Api.csproj" />
     <ProjectReference Include="../../src/Clients/OfficeSecurity.Client.Core/OfficeSecurity.Client.Core.csproj" />
+    <ProjectReference Include="../../src/Agent/OfficeSecurity.Agent.Core/OfficeSecurity.Agent.Core.csproj" />
   </ItemGroup>
 </Project>

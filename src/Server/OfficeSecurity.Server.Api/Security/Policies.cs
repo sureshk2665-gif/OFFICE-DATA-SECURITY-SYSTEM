@@ -16,6 +16,9 @@ public static class Policies
 
     public const string Staff = nameof(Staff);
 
+    /// <summary>An approved computer's security agent (mutual TLS).</summary>
+    public const string Computer = nameof(Computer);
+
     public static void Configure(Microsoft.AspNetCore.Authorization.AuthorizationOptions options)
     {
         ArgumentNullException.ThrowIfNull(options);
@@ -32,5 +35,7 @@ public static class Policies
             .RequireRole(nameof(AdminRole.SuperAdmin)));
         options.AddPolicy(Staff, p => p.AddAuthenticationSchemes(SessionAuthenticationHandler.SchemeName)
             .RequireRole(SessionAuthenticationHandler.StaffRole));
+        options.AddPolicy(Computer, p => p.AddAuthenticationSchemes(DeviceAuthenticationHandler.SchemeName)
+            .RequireRole(DeviceAuthenticationHandler.ComputerRole));
     }
 }

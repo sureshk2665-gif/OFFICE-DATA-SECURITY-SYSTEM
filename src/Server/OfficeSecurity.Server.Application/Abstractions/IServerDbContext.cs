@@ -15,5 +15,17 @@ public interface IServerDbContext
 
     DbSet<AuditEntry> AuditEntries { get; }
 
+    DbSet<Computer> Computers { get; }
+
+    DbSet<EnrollmentCode> EnrollmentCodes { get; }
+
+    DbSet<DeviceInventoryItem> Devices { get; }
+
+    DbSet<SecurityEvent> SecurityEvents { get; }
+
+    DbSet<PolicyDefinition> Policies { get; }
+
+    DbSet<StaffComputerAssignment> StaffAssignments { get; }
+
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

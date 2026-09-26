@@ -28,6 +28,27 @@ public static class ApiRoutes
     public const string AuditVerify = Prefix + "/audit/verify";
     public const string DashboardOverview = Prefix + "/dashboard/overview";
 
+    public const string Computers = Prefix + "/computers";
+    public const string EnrollmentCodes = Computers + "/enrollment-codes";
+    public const string Policies = Prefix + "/policies";
+    public const string Events = Prefix + "/events";
+
+    public const string AgentEnroll = Prefix + "/agent/enroll";
+    public const string AgentEnrollStatus = Prefix + "/agent/enroll/status";
+    public const string AgentHeartbeat = Prefix + "/agent/heartbeat";
+    public const string AgentPolicy = Prefix + "/agent/policy";
+    public const string AgentEvents = Prefix + "/agent/events";
+    public const string AgentInventory = Prefix + "/agent/inventory";
+    public const string AgentLoginTicket = Prefix + "/agent/login-ticket";
+
+    public static string ComputerById(Guid id) => $"{Computers}/{id}";
+    public static string ComputerApprove(Guid id) => $"{Computers}/{id}/approve";
+    public static string ComputerReject(Guid id) => $"{Computers}/{id}/reject";
+    public static string ComputerRetire(Guid id) => $"{Computers}/{id}/retire";
+    public static string ComputerPolicy(Guid id) => $"{Computers}/{id}/policy";
+    public static string ComputerStaff(Guid id) => $"{Computers}/{id}/staff";
+    public static string PolicyById(Guid id) => $"{Policies}/{id}";
+
     public static string StaffById(Guid id) => $"{Staff}/{id}";
     public static string StaffDisable(Guid id) => $"{Staff}/{id}/disable";
     public static string StaffEnable(Guid id) => $"{Staff}/{id}/enable";

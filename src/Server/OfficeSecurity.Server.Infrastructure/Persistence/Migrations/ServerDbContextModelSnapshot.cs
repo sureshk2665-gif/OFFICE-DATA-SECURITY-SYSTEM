@@ -194,10 +194,276 @@ namespace OfficeSecurity.Server.Infrastructure.Persistence.Migrations
                     b.ToTable("audit_log", (string)null);
                 });
 
+            modelBuilder.Entity("OfficeSecurity.Server.Domain.Computer", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("AgentVersion")
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("AppliedPolicyVersion")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long?>("CertificateExpiresAtUtc")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("CertificatePem")
+                        .HasMaxLength(4000)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("CertificateRequestPem")
+                        .HasMaxLength(4000)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("CertificateThumbprint")
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ControlStatusJson")
+                        .HasMaxLength(16000)
+                        .HasColumnType("TEXT");
+
+                    b.Property<long?>("DecidedAtUtc")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<Guid?>("DecidedByAdminId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("EnrollmentCodeId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("FailedControls")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("HardwareJson")
+                        .HasMaxLength(8000)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("HeartbeatIntervalSeconds")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Hostname")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
+
+                    b.Property<long?>("LastSeenAtUtc")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("LastSeenIp")
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("OsEdition")
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("OsName")
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid?>("PolicyId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("PolicyVersion")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("PollTokenHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("RegisteredAtUtc")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CertificateThumbprint")
+                        .IsUnique();
+
+                    b.HasIndex("Hostname");
+
+                    b.HasIndex("PolicyId");
+
+                    b.HasIndex("Status");
+
+                    b.ToTable("computers", (string)null);
+                });
+
+            modelBuilder.Entity("OfficeSecurity.Server.Domain.DeviceInventoryItem", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<Guid>("ComputerId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("DeviceClass")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("FirstSeenUtc")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("InstanceId")
+                        .IsRequired()
+                        .HasMaxLength(400)
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("IsConnected")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long>("LastSeenUtc")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Manufacturer")
+                        .HasMaxLength(256)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ComputerId", "InstanceId")
+                        .IsUnique();
+
+                    b.ToTable("device_inventory", (string)null);
+                });
+
+            modelBuilder.Entity("OfficeSecurity.Server.Domain.EnrollmentCode", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("CodeHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("CreatedAtUtc")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<Guid>("CreatedByAdminId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("ExpiresAtUtc")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long?>("UsedAtUtc")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CodeHash")
+                        .IsUnique();
+
+                    b.ToTable("enrollment_codes", (string)null);
+                });
+
+            modelBuilder.Entity("OfficeSecurity.Server.Domain.PolicyDefinition", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("IsDefault")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Revision")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("SettingsJson")
+                        .IsRequired()
+                        .HasMaxLength(64000)
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("UpdatedAtUtc")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<Guid?>("UpdatedByAdminId")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Name")
+                        .IsUnique();
+
+                    b.ToTable("policies", (string)null);
+                });
+
+            modelBuilder.Entity("OfficeSecurity.Server.Domain.SecurityEvent", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<Guid>("ComputerId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Details")
+                        .HasMaxLength(2000)
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("EventId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("EventType")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("OccurredAtUtc")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long>("ReceivedAtUtc")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Severity")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ComputerId", "EventId")
+                        .IsUnique();
+
+                    b.HasIndex("ComputerId", "OccurredAtUtc");
+
+                    b.HasIndex("EventType", "OccurredAtUtc");
+
+                    b.ToTable("security_events", (string)null);
+                });
+
             modelBuilder.Entity("OfficeSecurity.Server.Domain.Session", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid?>("ComputerId")
                         .HasColumnType("TEXT");
 
                     b.Property<long>("CreatedAtUtc")
@@ -302,6 +568,68 @@ namespace OfficeSecurity.Server.Infrastructure.Persistence.Migrations
                     b.HasIndex("Status");
 
                     b.ToTable("staff_accounts", (string)null);
+                });
+
+            modelBuilder.Entity("OfficeSecurity.Server.Domain.StaffComputerAssignment", b =>
+                {
+                    b.Property<Guid>("StaffId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("ComputerId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("AssignedAtUtc")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<Guid>("AssignedByAdminId")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("StaffId", "ComputerId");
+
+                    b.HasIndex("ComputerId");
+
+                    b.ToTable("staff_computer_assignments", (string)null);
+                });
+
+            modelBuilder.Entity("OfficeSecurity.Server.Domain.Computer", b =>
+                {
+                    b.HasOne("OfficeSecurity.Server.Domain.PolicyDefinition", null)
+                        .WithMany()
+                        .HasForeignKey("PolicyId")
+                        .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("OfficeSecurity.Server.Domain.DeviceInventoryItem", b =>
+                {
+                    b.HasOne("OfficeSecurity.Server.Domain.Computer", null)
+                        .WithMany()
+                        .HasForeignKey("ComputerId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("OfficeSecurity.Server.Domain.SecurityEvent", b =>
+                {
+                    b.HasOne("OfficeSecurity.Server.Domain.Computer", null)
+                        .WithMany()
+                        .HasForeignKey("ComputerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("OfficeSecurity.Server.Domain.StaffComputerAssignment", b =>
+                {
+                    b.HasOne("OfficeSecurity.Server.Domain.Computer", null)
+                        .WithMany()
+                        .HasForeignKey("ComputerId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("OfficeSecurity.Server.Domain.StaffAccount", null)
+                        .WithMany()
+                        .HasForeignKey("StaffId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 #pragma warning restore 612, 618
         }

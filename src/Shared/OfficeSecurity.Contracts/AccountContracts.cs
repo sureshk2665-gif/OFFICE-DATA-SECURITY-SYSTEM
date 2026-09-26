@@ -58,4 +58,9 @@ public sealed record DashboardOverviewResponse(
     int StaffPendingActivation,
     int StaffDisabled,
     int AdministratorsActive,
-    int FailedLoginsLast24Hours);
+    int FailedLoginsLast24Hours,
+    int ComputersTrusted,
+    int ComputersOnline,
+    int ComputersOffline,
+    int ComputersPendingApproval,
+    int ComputersWithFailedControls);

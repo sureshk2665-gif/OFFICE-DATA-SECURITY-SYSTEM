@@ -310,8 +310,17 @@ public sealed class AccountAdministration(
             e => e.Outcome == AuditOutcome.Failure && (e.Action == "auth.admin.login" || e.Action == "auth.staff.login") && e.OccurredAtUtc >= since,
             cancellationToken).ConfigureAwait(false);
 
+        var now = clock.GetUtcNow();
+        var computers = await db.Computers.AsNoTracking()
+            .Where(c => c.Status == ComputerStatus.Trusted || c.Status == ComputerStatus.PendingApproval)
+            .Select(c => new { c.Status, c.LastSeenAtUtc, c.HeartbeatIntervalSeconds, c.FailedControls })
+            .ToListAsync(cancellationToken).ConfigureAwait(false);
+        var trusted = computers.Where(c => c.Status == ComputerStatus.Trusted).ToList();
+        var online = trusted.Count(c => ComputerPresence.IsOnline(c.LastSeenAtUtc, c.HeartbeatIntervalSeconds, now));
+
         return new DashboardOverviewResponse(
-            counts.Sum(c => c.Count), Count(AccountStatus.Active), Count(AccountStatus.PendingActivation), Count(AccountStatus.Disabled), admins, failedLogins);
+            counts.Sum(c => c.Count), Count(AccountStatus.Active), Count(AccountStatus.PendingActivation), Count(AccountStatus.Disabled), admins, failedLogins,
+            trusted.Count, online, trusted.Count - online, computers.Count(c => c.Status == ComputerStatus.PendingApproval), trusted.Count(c => c.FailedControls > 0));
     }
 
     // ---------------------------------------------------------------- helpers

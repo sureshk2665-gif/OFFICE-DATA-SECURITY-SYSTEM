@@ -25,6 +25,7 @@ public sealed class AuthService(
     ISecretProtector protector,
     OneTimeTicketStore<AdminMfaTicket> mfaTickets,
     OneTimeTicketStore<AdminEnrollmentTicket> enrollmentTickets,
+    OneTimeTicketStore<ComputerLoginTicket> computerTickets,
     IOptions<SecurityOptions> options,
     TimeProvider clock)
 {
@@ -319,6 +320,14 @@ public sealed class AuthService(
             return ServiceError.Validation(passwordError);
         }
 
+        var (computerAllowed, computerId) = await CheckStaffComputerAsync(staff, request.ComputerTicket, cancellationToken).ConfigureAwait(false);
+        if (!computerAllowed)
+        {
+            await audit.RecordAndSaveAsync(context, new AuditRecord("auth.staff.activate", AuditOutcome.Failure, TargetType: "Staff", TargetId: staff.Id.ToString(),
+                Details: WrongComputerDetails(computerId), ActorTypeOverride: AuditActorType.Anonymous, ActorNameOverride: staff.EmployeeCode), cancellationToken).ConfigureAwait(false);
+            return ServiceError.Forbidden(WrongComputerMessage);
+        }
+
         staff.PasswordHash = hasher.Hash(request.NewPassword);
         staff.Status = AccountStatus.Active;
         staff.FailedLoginCount = 0;
@@ -327,8 +336,8 @@ public sealed class AuthService(
         staff.LastLoginAtUtc = now;
         code.UsedAtUtc = now;
 
-        var (token, session) = NewSession(PrincipalType.Staff, staff.Id, context, now);
-        await audit.RecordAndSaveAsync(context, new AuditRecord("auth.staff.activate", TargetType: "Staff", TargetId: staff.Id.ToString(),
+        var (token, session) = NewSession(PrincipalType.Staff, staff.Id, context, now, computerId);
+        await audit.RecordAndSaveAsync(context, new AuditRecord("auth.staff.activate", TargetType: "Staff", TargetId: staff.Id.ToString(), Details: ComputerDetails(computerId),
             ActorTypeOverride: AuditActorType.Staff, ActorIdOverride: staff.Id, ActorNameOverride: staff.EmployeeCode), cancellationToken).ConfigureAwait(false);
         return new SessionResponse(token, session.ExpiresAtUtc, ToUser(staff));
     }
@@ -365,6 +374,14 @@ public sealed class AuthService(
                 : SignInFailedMessage);
         }
 
+        var (computerAllowed, computerId) = await CheckStaffComputerAsync(staff!, request.ComputerTicket, cancellationToken).ConfigureAwait(false);
+        if (!computerAllowed)
+        {
+            await audit.RecordAndSaveAsync(context, new AuditRecord("auth.staff.login", AuditOutcome.Failure, TargetType: "Staff", TargetId: staff!.Id.ToString(),
+                Details: WrongComputerDetails(computerId), ActorTypeOverride: AuditActorType.Anonymous, ActorNameOverride: staff.EmployeeCode), cancellationToken).ConfigureAwait(false);
+            return ServiceError.Forbidden(WrongComputerMessage);
+        }
+
         if (hasher.NeedsRehash(staff!.PasswordHash!))
         {
             staff.PasswordHash = hasher.Hash(request.Password!);
@@ -373,8 +390,8 @@ public sealed class AuthService(
         staff.FailedLoginCount = 0;
         staff.LockedUntilUtc = null;
         staff.LastLoginAtUtc = now;
-        var (token, session) = NewSession(PrincipalType.Staff, staff.Id, context, now);
-        await audit.RecordAndSaveAsync(context, new AuditRecord("auth.staff.login", TargetType: "Staff", TargetId: staff.Id.ToString(),
+        var (token, session) = NewSession(PrincipalType.Staff, staff.Id, context, now, computerId);
+        await audit.RecordAndSaveAsync(context, new AuditRecord("auth.staff.login", TargetType: "Staff", TargetId: staff.Id.ToString(), Details: ComputerDetails(computerId),
             ActorTypeOverride: AuditActorType.Staff, ActorIdOverride: staff.Id, ActorNameOverride: staff.EmployeeCode), cancellationToken).ConfigureAwait(false);
         return new SessionResponse(token, session.ExpiresAtUtc, ToUser(staff));
     }
@@ -549,7 +566,33 @@ public sealed class AuthService(
         return match is not null && match.IsUsableAt(now) ? match : null;
     }
 
-    private (string Token, Session Session) NewSession(PrincipalType type, Guid principalId, RequestContext context, DateTimeOffset now)
+    private const string WrongComputerMessage =
+        "This account can only be used on the computers your administrator has assigned to it.";
+
+    private static string WrongComputerDetails(Guid? computerId) =>
+        computerId is null ? "not on an enrolled computer (restricted account)" : $"computer {computerId} is not assigned to this account";
+
+    private static string? ComputerDetails(Guid? computerId) => computerId is null ? null : $"computer {computerId}";
+
+    /// <summary>
+    /// Staff with assigned computers may only sign in on one of them, proven by a ticket the agent on that
+    /// computer obtained over mutual TLS. Staff without assignments are not restricted.
+    /// </summary>
+    private async Task<(bool Allowed, Guid? ComputerId)> CheckStaffComputerAsync(StaffAccount staff, string? ticket, CancellationToken cancellationToken)
+    {
+        Guid? computerId = null;
+        if (!string.IsNullOrEmpty(ticket) && computerTickets.TryPeek(ticket, out var value))
+        {
+            computerTickets.Consume(ticket);
+            computerId = value.ComputerId;
+        }
+
+        var assigned = await db.StaffAssignments.AsNoTracking().Where(a => a.StaffId == staff.Id)
+            .Select(a => a.ComputerId).ToListAsync(cancellationToken).ConfigureAwait(false);
+        return (assigned.Count == 0 || (computerId is { } id && assigned.Contains(id)), computerId);
+    }
+
+    private (string Token, Session Session) NewSession(PrincipalType type, Guid principalId, RequestContext context, DateTimeOffset now, Guid? computerId = null)
     {
         var token = SecretCodes.NewToken();
         var session = new Session
@@ -562,6 +605,7 @@ public sealed class AuthService(
             LastSeenAtUtc = now,
             ExpiresAtUtc = now + (type == PrincipalType.Admin ? _options.AdminSessionLifetime : _options.StaffSessionLifetime),
             SourceIp = context.SourceIp,
+            ComputerId = computerId,
         };
         db.Sessions.Add(session);
         return (token, session);

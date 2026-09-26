@@ -23,4 +23,7 @@ public enum SecurityEventType
     PolicyApplied = 16,
     SuccessfulLogin = 17,
     Logout = 18,
+    AgentStarted = 19,
+    DeviceConnected = 20,
+    DeviceDisconnected = 21,
 }

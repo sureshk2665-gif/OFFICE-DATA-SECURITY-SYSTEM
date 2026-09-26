@@ -1,38 +1,45 @@
-using OfficeSecurity.Agent.Enforcement;
-using OfficeSecurity.Contracts;
+using OfficeSecurity.Agent.Core;
 
 namespace OfficeSecurity.Agent;
 
-/// <summary>
-/// Main agent loop. Phase 1 scope: runs as a Windows Service and reports which controls are
-/// implemented. Server communication and policy enforcement are added in Phases 3 and 5.
-/// </summary>
-internal sealed partial class AgentWorker(EnforcementCoordinator coordinator, ILogger<AgentWorker> logger) : BackgroundService
+/// <summary>Runs the agent loop and the local status pipe for as long as the service runs.</summary>
+internal sealed partial class AgentWorker(AgentRuntime runtime, AgentLocalServer localServer, TimeProvider clock, ILogger<AgentWorker> logger) : BackgroundService
 {
-    private static readonly TimeSpan Interval = TimeSpan.FromSeconds(60);
-
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        LogStarted(logger, Environment.MachineName);
-
-        // No enrolled policy exists yet in Phase 1; verification uses an empty "unenrolled" policy.
-        var policy = UnenrolledPolicy.Create();
-
-        using var timer = new PeriodicTimer(Interval);
-        do
+        var pipe = localServer.RunAsync(stoppingToken);
+        while (!stoppingToken.IsCancellationRequested)
         {
-            var statuses = await coordinator.VerifyAsync(policy, stoppingToken);
-            foreach (var status in statuses)
+            TimeSpan delay;
+            try
             {
-                LogControlStatus(logger, status.Control, status.State, status.Details);
+                delay = await runtime.RunOnceAsync(stoppingToken);
+            }
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+            {
+                break;
+            }
+#pragma warning disable CA1031 // The service must keep running (and enforcing the cached policy) whatever goes wrong.
+            catch (Exception ex)
+#pragma warning restore CA1031
+            {
+                LogUnexpected(logger, ex);
+                delay = TimeSpan.FromMinutes(1);
+            }
+
+            try
+            {
+                await Task.Delay(delay, clock, stoppingToken);
+            }
+            catch (OperationCanceledException)
+            {
+                break;
             }
         }
-        while (await timer.WaitForNextTickAsync(stoppingToken));
+
+        await pipe;
     }
 
-    [LoggerMessage(Level = LogLevel.Information, Message = "Office Security Agent started on {MachineName} (development build: not enrolled, no enforcement).")]
-    private static partial void LogStarted(ILogger logger, string machineName);
-
-    [LoggerMessage(Level = LogLevel.Information, Message = "Control {Control}: {State} {Details}")]
-    private static partial void LogControlStatus(ILogger logger, SecurityControl control, ControlState state, string? details);
+    [LoggerMessage(Level = LogLevel.Error, Message = "Unexpected agent error; retrying in one minute.")]
+    private static partial void LogUnexpected(ILogger logger, Exception exception);
 }

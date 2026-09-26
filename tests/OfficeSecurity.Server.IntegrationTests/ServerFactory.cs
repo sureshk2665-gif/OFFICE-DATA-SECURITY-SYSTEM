@@ -29,7 +29,11 @@ public sealed partial class ServerFactory : WebApplicationFactory<Program>
         builder.UseSetting("Server:HttpsPort", HttpsPort.ToString(System.Globalization.CultureInfo.InvariantCulture));
         builder.UseSetting("Security:PasswordHashIterations", "1000");
         builder.UseSetting("Security:SignInRequestsPerMinute", "100000");
-        builder.ConfigureTestServices(services => services.AddSingleton<TimeProvider>(Clock));
+        builder.ConfigureTestServices(services =>
+        {
+            services.AddSingleton<TimeProvider>(Clock);
+            services.AddTransient<Microsoft.AspNetCore.Hosting.IStartupFilter, TestClientCertificateFilter>();
+        });
     }
 
     public override async ValueTask DisposeAsync()
@@ -48,9 +52,25 @@ public sealed partial class ServerFactory : WebApplicationFactory<Program>
 
     public string DatabaseFile => Path.Combine(DataDirectory, "office-security.db");
 
+    /// <summary>True after <see cref="StartRealHttps"/>: requests go over real TLS to Kestrel.</summary>
+    public bool RealTls { get; private set; }
+
+    public void StartRealHttps()
+    {
+        UseKestrel();
+        StartServer();
+        RealTls = true;
+    }
+
     public HttpClient Client(string? token = null)
     {
-        var client = CreateClient();
+        var client = RealTls
+            ? new HttpClient(OfficeSecurity.Client.Core.ServerTrust.CreatePinnedHandler(
+                System.Security.Cryptography.X509Certificates.X509CertificateLoader.LoadCertificateFromFile(Path.Combine(DataDirectory, "certificates", "office-security-ca.cer"))))
+            {
+                BaseAddress = new Uri($"https://localhost:{HttpsPort}"),
+            }
+            : CreateClient();
         if (token is not null)
         {
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
@@ -128,6 +148,21 @@ public sealed partial class ServerFactory : WebApplicationFactory<Program>
         var session = await (await anonymous.PostAsJsonAsync(ApiRoutes.StaffActivate, new StaffActivateRequest(employeeCode, code!.SetupCode, password)))
             .EnsureSuccessStatusCode().Content.ReadFromJsonAsync<SessionResponse>();
         return (code.AccountId, session!.Token);
+    }
+
+    public string PairingCodeFromConnectionInfo()
+    {
+        _ = Services;
+        var info = File.ReadAllText(Path.Combine(DataDirectory, "SERVER-CONNECTION-INFO.txt"));
+        return info.Split('\n').Single(l => l.StartsWith("Pairing code:", StringComparison.Ordinal))["Pairing code:".Length..].Trim();
+    }
+
+    public async Task<string> CreateEnrollmentCodeAsync(string adminToken)
+    {
+        using var admin = Client(adminToken);
+        var response = await (await admin.PostAsync(new Uri(ApiRoutes.EnrollmentCodes, UriKind.Relative), null))
+            .EnsureSuccessStatusCode().Content.ReadFromJsonAsync<EnrollmentCodeResponse>();
+        return response!.EnrollmentCode;
     }
 
     [GeneratedRegex("[A-Z2-9]{4}-[A-Z2-9]{4}-[A-Z2-9]{4}")]

@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Data.Sqlite" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\OfficeSecurity.Agent.Enforcement\OfficeSecurity.Agent.Enforcement.csproj" />
+    <ProjectReference Include="..\..\Clients\OfficeSecurity.Client.Core\OfficeSecurity.Client.Core.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="OfficeSecurity.Agent.UnitTests" />
+    <InternalsVisibleTo Include="OfficeSecurity.Server.IntegrationTests" />
+  </ItemGroup>
+</Project>

@@ -11,6 +11,10 @@ internal static class HttpResults
         context.Items[SessionAuthenticationHandler.PrincipalItemKey] as CurrentPrincipal
         ?? throw new InvalidOperationException("Endpoint requires an authenticated principal.");
 
+    public static Guid RequireComputerId(this HttpContext context) =>
+        context.Items[DeviceAuthenticationHandler.ComputerIdItemKey] as Guid?
+        ?? throw new InvalidOperationException("Endpoint requires an authenticated computer.");
+
     public static IResult ToHttp<T>(this Result<T> result) =>
         result.IsSuccess ? TypedResults.Ok(result.Value) : Problem(result.Error!);
 

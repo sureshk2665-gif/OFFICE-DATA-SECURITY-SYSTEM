@@ -23,6 +23,8 @@ public sealed class AuthorizationTests
         "POST " + ApiRoutes.AdminMfa,
         "POST " + ApiRoutes.StaffLogin,
         "POST " + ApiRoutes.StaffActivate,
+        "POST " + ApiRoutes.AgentEnroll,
+        "POST " + ApiRoutes.AgentEnrollStatus,
     ];
 
     private static List<(string Method, string Route, bool Anonymous)> Endpoints(ServerFactory server)

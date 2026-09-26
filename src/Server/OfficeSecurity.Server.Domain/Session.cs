@@ -22,4 +22,7 @@ public sealed class Session
     public string? EndReason { get; set; }
 
     public string? SourceIp { get; set; }
+
+    /// <summary>For staff sessions: the computer the sign-in was verified on, if any.</summary>
+    public Guid? ComputerId { get; set; }
 }

@@ -8,7 +8,9 @@ using OfficeSecurity.Server.Application.Abstractions;
 namespace OfficeSecurity.Server.Infrastructure.Certificates;
 
 /// <summary>Certificates the server uses: its private CA and the HTTPS certificate issued by it.</summary>
-public sealed record ServerCertificates(X509Certificate2 CaCertificate, byte[] ServerCertificatePfx, IReadOnlyList<string> ServerNames);
+/// <param name="CaCertificate">Public CA certificate (no private key).</param>
+/// <param name="CaWithPrivateKey">CA certificate with its private key, kept in server memory to issue computer certificates.</param>
+public sealed record ServerCertificates(X509Certificate2 CaCertificate, X509Certificate2 CaWithPrivateKey, byte[] ServerCertificatePfx, IReadOnlyList<string> ServerNames);
 
 /// <summary>
 /// Private certificate authority created on first start (ADR-0003). Private keys are stored only in
@@ -29,7 +31,7 @@ public sealed class ServerCertificateAuthority(string certificateDirectory, ISec
         Directory.CreateDirectory(certificateDirectory);
         var now = clock.GetUtcNow();
 
-        using var ca = LoadPfx(CaFile) ?? CreateCa(now);
+        var ca = LoadPfx(CaFile) ?? CreateCa(now);
         var names = CollectServerNames(additionalNames);
 
         var serverPfx = LoadProtected(ServerFile);
@@ -41,7 +43,7 @@ public sealed class ServerCertificateAuthority(string certificateDirectory, ISec
 
         var caPublic = X509CertificateLoader.LoadCertificate(ca.RawData);
         File.WriteAllBytes(Path.Combine(certificateDirectory, PublicCaFile), caPublic.RawData);
-        return new ServerCertificates(caPublic, serverPfx, names);
+        return new ServerCertificates(caPublic, ca, serverPfx, names);
     }
 
     /// <summary>Host names and addresses the HTTPS certificate is valid for.</summary>

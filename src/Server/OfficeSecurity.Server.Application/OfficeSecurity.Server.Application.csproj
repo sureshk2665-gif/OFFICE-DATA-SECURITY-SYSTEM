@@ -10,6 +10,7 @@
   <ItemGroup>
     <ProjectReference Include="..\OfficeSecurity.Server.Domain\OfficeSecurity.Server.Domain.csproj" />
     <ProjectReference Include="..\..\Shared\OfficeSecurity.Contracts\OfficeSecurity.Contracts.csproj" />
+    <ProjectReference Include="..\..\Shared\OfficeSecurity.Policy\OfficeSecurity.Policy.csproj" />
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="OfficeSecurity.Server.UnitTests" />

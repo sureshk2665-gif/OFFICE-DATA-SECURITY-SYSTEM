@@ -1,6 +1,7 @@
 <Solution>
   <Folder Name="/src/" />
   <Folder Name="/src/Agent/">
+    <Project Path="src/Agent/OfficeSecurity.Agent.Core/OfficeSecurity.Agent.Core.csproj" />
     <Project Path="src/Agent/OfficeSecurity.Agent.Enforcement/OfficeSecurity.Agent.Enforcement.csproj" />
     <Project Path="src/Agent/OfficeSecurity.Agent/OfficeSecurity.Agent.csproj" />
   </Folder>

@@ -20,9 +20,10 @@ public sealed record AdminLoginResponse(string MfaTicket);
 
 public sealed record AdminMfaRequest(string MfaTicket, string Code);
 
-public sealed record StaffLoginRequest(string EmployeeCode, string Password);
+/// <param name="ComputerTicket">From the agent on this computer; required when the staff member is restricted to assigned computers.</param>
+public sealed record StaffLoginRequest(string EmployeeCode, string Password, string? ComputerTicket = null);
 
-public sealed record StaffActivateRequest(string EmployeeCode, string SetupCode, string NewPassword);
+public sealed record StaffActivateRequest(string EmployeeCode, string SetupCode, string NewPassword, string? ComputerTicket = null);
 
 public sealed record ChangePasswordRequest(string CurrentPassword, string NewPassword);
 

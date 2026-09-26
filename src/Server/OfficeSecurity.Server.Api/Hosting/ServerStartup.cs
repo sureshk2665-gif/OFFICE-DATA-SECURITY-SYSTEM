@@ -18,6 +18,7 @@ internal static partial class ServerStartup
         await using var scope = app.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<ServerDbContext>();
         await DatabaseInitializer.InitializeAsync(db);
+        await scope.ServiceProvider.GetRequiredService<PolicyService>().EnsureDefaultPolicyAsync();
 
         var pairingCode = PairingCode.Compute(certificates.CaCertificate.RawData);
         var addresses = certificates.ServerNames

@@ -3,6 +3,7 @@ using System.Security.Authentication;
 using System.Security.Cryptography.X509Certificates;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Server.Kestrel.Https;
 using Microsoft.EntityFrameworkCore;
 using OfficeSecurity.Contracts;
 using OfficeSecurity.Server.Api.Endpoints;
@@ -39,6 +40,10 @@ builder.WebHost.ConfigureKestrel(kestrel =>
     kestrel.ListenAnyIP(httpsPort, listen => listen.UseHttps(https =>
     {
         https.SslProtocols = SslProtocols.Tls12 | SslProtocols.Tls13;
+        // Agents present a client certificate (mutual TLS); people using the dashboard and staff app do not.
+        // Certificates are validated by DeviceAuthenticationHandler against this server's own CA.
+        https.ClientCertificateMode = ClientCertificateMode.AllowCertificate;
+        https.AllowAnyClientCertificate();
         https.ServerCertificate = X509CertificateLoader.LoadPkcs12(
             certificates.ServerCertificatePfx,
             password: null,
@@ -51,6 +56,9 @@ builder.WebHost.ConfigureKestrel(kestrel =>
 builder.Services.AddSingleton(paths);
 builder.Services.AddSingleton(certificates);
 builder.Services.AddSingleton<ISecretProtector>(secretProtector);
+builder.Services.AddSingleton<DeviceCertificateAuthority>();
+builder.Services.AddSingleton<IDeviceCertificateAuthority>(sp => sp.GetRequiredService<DeviceCertificateAuthority>());
+builder.Services.AddSingleton<IPolicySigningService>(new PolicySigningService(paths.CertificatesDirectory, secretProtector));
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.Configure<SecurityOptions>(builder.Configuration.GetSection(SecurityOptions.SectionName));
 
@@ -61,13 +69,18 @@ builder.Services.AddSingleton(sp => new PasswordHasher(
     sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<SecurityOptions>>().Value.PasswordHashIterations));
 builder.Services.AddSingleton<OneTimeTicketStore<AdminMfaTicket>>();
 builder.Services.AddSingleton<OneTimeTicketStore<AdminEnrollmentTicket>>();
+builder.Services.AddSingleton<OneTimeTicketStore<ComputerLoginTicket>>();
 builder.Services.AddSingleton<AuditChainLock>();
 builder.Services.AddScoped<AuditLog>();
 builder.Services.AddScoped<AuthService>();
 builder.Services.AddScoped<AccountAdministration>();
+builder.Services.AddScoped<PolicyService>();
+builder.Services.AddScoped<ComputerAdministration>();
+builder.Services.AddScoped<AgentService>();
 
 builder.Services.AddAuthentication(SessionAuthenticationHandler.SchemeName)
-    .AddScheme<AuthenticationSchemeOptions, SessionAuthenticationHandler>(SessionAuthenticationHandler.SchemeName, null);
+    .AddScheme<AuthenticationSchemeOptions, SessionAuthenticationHandler>(SessionAuthenticationHandler.SchemeName, null)
+    .AddScheme<AuthenticationSchemeOptions, DeviceAuthenticationHandler>(DeviceAuthenticationHandler.SchemeName, null);
 builder.Services.AddAuthorization(Policies.Configure);
 
 var signInRequestsPerMinute = builder.Configuration.GetValue("Security:SignInRequestsPerMinute", 20);
@@ -77,6 +90,10 @@ builder.Services.AddRateLimiter(options =>
     options.AddPolicy(AuthEndpoints.SignInRateLimit, http => RateLimitPartition.GetFixedWindowLimiter(
         http.Connection.RemoteIpAddress?.ToString() ?? "unknown",
         _ => new FixedWindowRateLimiterOptions { PermitLimit = signInRequestsPerMinute, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
+    // Pending agents poll for approval about once a minute; allow a whole office behind one address.
+    options.AddPolicy(ComputerEndpoints.EnrollmentRateLimit, http => RateLimitPartition.GetFixedWindowLimiter(
+        http.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        _ => new FixedWindowRateLimiterOptions { PermitLimit = signInRequestsPerMinute * 10, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
 });
 
 builder.Services.AddProblemDetails();
@@ -101,6 +118,7 @@ app.MapGet(ApiRoutes.CaCertificate, (ServerCertificates certs) => TypedResults.B
 
 app.MapAuthEndpoints();
 app.MapAdministrationEndpoints();
+app.MapComputerEndpoints();
 
 await ServerStartup.InitializeAsync(app, certificates, httpsPort);
 await app.RunAsync();

@@ -42,3 +42,17 @@ public enum AuditOutcome
     Success,
     Failure,
 }
+
+public enum ComputerStatus
+{
+    /// <summary>Agent enrolled with a valid code; waiting for an administrator to approve it.</summary>
+    PendingApproval,
+
+    /// <summary>Approved: holds a client certificate and may talk to the server.</summary>
+    Trusted,
+
+    Rejected,
+
+    /// <summary>Removed from management; its certificate is no longer accepted.</summary>
+    Retired,
+}
