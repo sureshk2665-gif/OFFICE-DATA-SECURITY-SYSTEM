@@ -35,7 +35,7 @@ in the same run and all passed.
 | **Application Control, Enforce mode** | On (verified) after 32 s |
 | **Real effect:** the same program in a user folder | **Refused by Windows: "An Application Control policy has blocked this file." (error 4551)** |
 | **Real effect:** the same program installed in Program Files | Ran normally (exit code 0) |
-| Block reported to the server | yes ("Blocked by Application Control: …") |
+| Block reported to the server | **Correction (found in Phase 6):** this check was wrong. It also matched the earlier audit-mode report ("would be blocked by Application Control"), so it did not prove that the enforced block reached the server. The Phase 6 test checks it properly; see the Phase 6 test report. |
 | The agent service **restarted while Application Control was enforced** | Running again after 2 s and reporting normally |
 | Application Control switched **off** | Policy removed after 18 s. The program in the user folder **runs again**, without a Windows restart. |
 | **Windows sign-in records** | On (verified) |
