@@ -250,7 +250,7 @@ public sealed class SecurityControlTests
 
         Assert.Equal(ControlState.PartiallyEnforced, status.State);
         Assert.Contains("NOT blocked yet", status.Details, StringComparison.Ordinal);
-        Assert.Equal(2, Value(SoftwareInstallationEnforcer.InstallerKey, "DisableUserInstalls"));
+        Assert.Equal(1, Value(SoftwareInstallationEnforcer.InstallerKey, "DisableMSI"));
         Assert.Equal(1, Value(SoftwareInstallationEnforcer.AppxKey, "BlockNonAdminUserInstall"));
     }
 

@@ -34,7 +34,7 @@
 |---|---|---|
 | USB drives, memory cards, CD/DVD (C1) | "Removable Storage Access" policies: *Removable Disks*: deny read, write, execute. *CD and DVD*, *Floppy*, *Tape*: deny read, write. | On (verified) / Audit only / Off |
 | Phones and cameras, MTP/PTP (C4) | "Removable Storage Access": *WPD Devices*, deny read and write (both WPD interface classes) | On (verified) / Audit only / Off |
-| Software installation by staff (C7) | "Prohibit User Installs" (`DisableUserInstalls = 2`); "Prevent non-admin users from installing packaged Windows apps" (`BlockNonAdminUserInstall = 1`) | **Partly on**: portable programs and per-user EXE installers need Application Control (a later part) |
+| Software installation by staff (C7) | "Turn off Windows Installer: for non-managed applications only" (`DisableMSI = 1`); "Prevent non-admin users from installing packaged Windows apps" (`BlockNonAdminUserInstall = 1`) | **Partly on**: portable programs and per-user EXE installers need Application Control (a later part) |
 | Website restrictions (C10) | Edge and Chrome: `URLBlocklist`, `URLAllowlist`, InPrivate / Incognito disabled. Firefox: `WebsiteFilter`, `DisablePrivateBrowsing`. | On (verified); other browsers are not covered |
 | Programs blocked from the network (C9, part) | Windows Defender Firewall outbound block rule per program path, in group "Office Security System" | On (verified) / Partly on (firewall off on a profile) |
 | Agent self-protection (C16) | Checks automatic start, restart on failure, and that only SYSTEM and Administrators may stop or change the service. Restores the settings if changed. | On (verified) |

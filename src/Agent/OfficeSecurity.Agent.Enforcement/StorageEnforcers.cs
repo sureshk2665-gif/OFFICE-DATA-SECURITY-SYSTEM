@@ -110,12 +110,12 @@ public sealed class SoftwareInstallationEnforcer(RegistryPolicyEngine engine, IE
     protected override RegistryPlan Plan(SecurityPolicyDocument policy) => !policy.SoftwareInstallation.BlockStaffInstalls
         ? RegistryPlan.NotConfigured()
         : new RegistryPlan(ControlState.PartiallyEnforced,
-            "Blocked: per-user Windows Installer (MSI) installations and packaged (Store/AppX) app installations by standard users. "
+            "Blocked: Windows Installer (MSI) installations started by staff (\"Turn off Windows Installer: for non-managed applications only\") and packaged (Store/AppX) app installations by standard users. "
             + "Standard Windows accounts already cannot install programs for all users. NOT blocked yet: portable programs and "
             + "EXE installers that install into the user's own folders — that needs Application Control.",
             [
-                // "Prohibit User Installs" (MSI.admx, DisableUserInstalls): 2 = prevent per-user installations.
-                new PolicyValue(InstallerKey, "DisableUserInstalls", 2),
+                // "Turn off Windows Installer" (MSI.admx, DisableMSI): 1 = "For non-managed applications only".
+                new PolicyValue(InstallerKey, "DisableMSI", 1),
                 // "Prevent non-admin users from installing packaged Windows apps" (AppxPackageManager.admx).
                 new PolicyValue(AppxKey, "BlockNonAdminUserInstall", 1),
             ]);

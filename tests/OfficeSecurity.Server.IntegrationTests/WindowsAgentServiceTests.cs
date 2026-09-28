@@ -143,7 +143,7 @@ public sealed partial class WindowsAgentServiceTests(ITestOutputHelper output)
         {
             Assert.Null(HklmValue(UsbKey, "Deny_Read"));
             Assert.Null(HklmValue(@"SOFTWARE\Policies\Microsoft\Edge\URLBlocklist", "1"));
-            Assert.Null(HklmValue(@"SOFTWARE\Policies\Microsoft\Windows\Installer", "DisableUserInstalls"));
+            Assert.Null(HklmValue(@"SOFTWARE\Policies\Microsoft\Windows\Installer", "DisableMSI"));
             Assert.Null(new WindowsFirewall().Find(FirewallEnforcer.RuleName(_blockedCurl)));
             output.WriteLine("After uninstall: USB, website, installation and firewall settings made by the agent are gone.");
         }
@@ -196,7 +196,7 @@ public sealed partial class WindowsAgentServiceTests(ITestOutputHelper output)
         Assert.Equal(1, HklmValue(UsbKey, "Deny_Read"));
         Assert.Equal(1, HklmValue(UsbKey, "Deny_Execute"));
         Assert.Equal("example.com", HklmValue(@"SOFTWARE\Policies\Microsoft\Edge\URLBlocklist", "1"));
-        Assert.Equal(2, HklmValue(@"SOFTWARE\Policies\Microsoft\Windows\Installer", "DisableUserInstalls"));
+        Assert.Equal(1, HklmValue(@"SOFTWARE\Policies\Microsoft\Windows\Installer", "DisableMSI"));
 
         // Effect 1: Microsoft Edge refuses the blocked site but still opens others.
         var edge = new[] { Environment.SpecialFolder.ProgramFilesX86, Environment.SpecialFolder.ProgramFiles }
