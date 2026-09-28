@@ -235,7 +235,46 @@ public sealed class ApiClient : IDisposable
         SendAsync<List<StaffReference>>(HttpMethod.Put, ApiRoutes.ComputerStaff(id), new AssignStaffRequest(staffIds), ct);
 
     public Task<PagedResult<SecurityEventResponse>> ListEventsAsync(int page, int pageSize, Guid? computerId, string? search, CancellationToken ct = default) =>
-        SendAsync<PagedResult<SecurityEventResponse>>(HttpMethod.Get, ApiRoutes.Events + Query(("page", page), ("pageSize", pageSize), ("computerId", computerId), ("search", search)), null, ct);
+        ListEventsAsync(page, pageSize, computerId, search, null, null, null, null, ct);
+
+    public Task<PagedResult<SecurityEventResponse>> ListEventsAsync(int page, int pageSize, Guid? computerId, string? search, string? severity, string? type,
+        DateTimeOffset? from, DateTimeOffset? to, CancellationToken ct = default) =>
+        SendAsync<PagedResult<SecurityEventResponse>>(HttpMethod.Get, ApiRoutes.Events + Query(("page", page), ("pageSize", pageSize), ("computerId", computerId),
+            ("search", search), ("severity", severity), ("type", type), ("from", from?.ToString("O", CultureInfo.InvariantCulture)), ("to", to?.ToString("O", CultureInfo.InvariantCulture))), null, ct);
+
+    // ---------------------------------------------------------------- alerts and reports
+
+    public Task<PagedResult<AlertResponse>> ListAlertsAsync(int page, int pageSize, string? status, string? severity, string? search, CancellationToken ct = default) =>
+        SendAsync<PagedResult<AlertResponse>>(HttpMethod.Get, ApiRoutes.Alerts + Query(("page", page), ("pageSize", pageSize), ("status", status), ("severity", severity), ("search", search)), null, ct);
+
+    public Task<AlertSummaryResponse> GetAlertSummaryAsync(CancellationToken ct = default) =>
+        SendAsync<AlertSummaryResponse>(HttpMethod.Get, ApiRoutes.AlertSummary, null, ct);
+
+    public Task<AlertResponse> AcknowledgeAlertAsync(Guid id, CancellationToken ct = default) =>
+        SendAsync<AlertResponse>(HttpMethod.Post, ApiRoutes.AlertAcknowledge(id), null, ct);
+
+    public Task<AlertResponse> ResolveAlertAsync(Guid id, string? note, CancellationToken ct = default) =>
+        SendAsync<AlertResponse>(HttpMethod.Post, ApiRoutes.AlertResolve(id), new ResolveAlertRequest(note), ct);
+
+    public Task<List<AlertRuleResponse>> ListAlertRulesAsync(CancellationToken ct = default) =>
+        SendAsync<List<AlertRuleResponse>>(HttpMethod.Get, ApiRoutes.AlertRules, null, ct);
+
+    public Task<AlertRuleResponse> UpdateAlertRuleAsync(string code, UpdateAlertRuleRequest request, CancellationToken ct = default) =>
+        SendAsync<AlertRuleResponse>(HttpMethod.Put, ApiRoutes.AlertRuleByCode(code), request, ct);
+
+    public Task<List<ReportTypeInfo>> ListReportTypesAsync(CancellationToken ct = default) =>
+        SendAsync<List<ReportTypeInfo>>(HttpMethod.Get, ApiRoutes.Reports, null, ct);
+
+    /// <summary>Creates a report on the server and returns the file's content.</summary>
+    public Task<byte[]> DownloadReportAsync(string type, DateTimeOffset from, DateTimeOffset to, Guid? computerId, string format, CancellationToken ct = default) =>
+        SendAsync<byte[]>(HttpMethod.Get, ApiRoutes.Report(type) + Query(("from", from.ToString("O", CultureInfo.InvariantCulture)), ("to", to.ToString("O", CultureInfo.InvariantCulture)),
+            ("computerId", computerId), ("format", format)), null, ct);
+
+    public Task<List<SavedReportInfo>> ListSavedReportsAsync(CancellationToken ct = default) =>
+        SendAsync<List<SavedReportInfo>>(HttpMethod.Get, ApiRoutes.SavedReports, null, ct);
+
+    public Task<byte[]> DownloadSavedReportAsync(string fileName, CancellationToken ct = default) =>
+        SendAsync<byte[]>(HttpMethod.Get, ApiRoutes.SavedReport(fileName), null, ct);
 
     public Task<List<ExemptionResponse>> ListExemptionsAsync(Guid computerId, CancellationToken ct = default) =>
         SendAsync<List<ExemptionResponse>>(HttpMethod.Get, ApiRoutes.ComputerExemptions(computerId), null, ct);
@@ -368,6 +407,11 @@ public sealed class ApiClient : IDisposable
                 if (response.StatusCode == HttpStatusCode.NoContent || typeof(T) == typeof(object))
                 {
                     return default!;
+                }
+
+                if (typeof(T) == typeof(byte[]))
+                {
+                    return (T)(object)await response.Content.ReadAsByteArrayAsync(ct).ConfigureAwait(false);
                 }
 
                 return await response.Content.ReadFromJsonAsync<T>(ct).ConfigureAwait(false)

@@ -89,7 +89,7 @@ Every endpoint in this group is anonymous and rate-limited.
 | `POST /api/v1/computers/{id}/retire` | AdminWrite | → `ComputerSummary` |
 | `PUT /api/v1/computers/{id}/policy` | AdminWrite | `AssignPolicyRequest` → `ComputerSummary` |
 | `PUT /api/v1/computers/{id}/staff` | AdminWrite | `AssignStaffRequest` → `StaffReference[]` |
-| `GET /api/v1/events?page&pageSize&computerId&search` | AdminRead | → `PagedResult<SecurityEventResponse>` |
+| `GET /api/v1/events?page&pageSize&computerId&search&severity&type&from&to` | AdminRead | → `PagedResult<SecurityEventResponse>` (`from` inclusive, `to` exclusive, ISO 8601) |
 | `GET /api/v1/policies` | AdminRead | → `PolicySummary[]` |
 | `GET /api/v1/policies/{id}` | AdminRead | → `PolicyDetail` |
 | `POST /api/v1/policies` | AdminWrite | `SavePolicyRequest` → `PolicyDetail` |
@@ -100,6 +100,16 @@ Every endpoint in this group is anonymous and rate-limited.
 | `DELETE /api/v1/computers/{id}/exemptions/{exemptionId}` | AdminWrite | → 204 (ends it early; 409 if already ended) |
 | `GET /api/v1/computers/{id}/recovery-keys` | AdminRead | → `RecoveryKeyResponse[]` (drive, key ID, dates; never the key itself) |
 | `POST /api/v1/computers/{id}/recovery-keys/{keyId}/reveal` | **SuperAdmin** | → `RecoveryKeyRevealResponse` with the recovery password; audited as `bitlocker.recovery-key.reveal` |
+| `GET /api/v1/alerts?page&pageSize&status&severity&computerId&search` | AdminRead | → `PagedResult<AlertResponse>`; `status` = Open, Acknowledged, Resolved, Active (not resolved) or anything else for all |
+| `GET /api/v1/alerts/summary` | AdminRead | → `AlertSummaryResponse` (open, open critical, acknowledged) |
+| `POST /api/v1/alerts/{id}/acknowledge` | AdminWrite | → `AlertResponse` (409 if not open); audited |
+| `POST /api/v1/alerts/{id}/resolve` | AdminWrite | `ResolveAlertRequest` (optional note ≤ 1000) → `AlertResponse` (409 if resolved); audited |
+| `GET /api/v1/alerts/rules` | AdminRead | → `AlertRuleResponse[]` |
+| `PUT /api/v1/alerts/rules/{code}` | AdminWrite | `UpdateAlertRuleRequest` (enabled, severity, number, minutes) → `AlertRuleResponse`; audited |
+| `GET /api/v1/reports` | AdminRead | → `ReportTypeInfo[]` |
+| `GET /api/v1/reports/{type}?from&to&computerId&format=csv\|pdf` | AdminRead | → the file (`text/csv` or `application/pdf`); default last 7 days, at most 400 days; audited as `report.export` with the SHA-256 |
+| `GET /api/v1/reports/saved` | AdminRead | → `SavedReportInfo[]` (automatic weekly/monthly summaries) |
+| `GET /api/v1/reports/saved/{fileName}` | AdminRead | → the PDF; only names from the list above (404 otherwise) |
 
 Policy types (`PolicySettings`, `PolicyDetail`, …) are in `src/Shared/OfficeSecurity.Policy`.
 

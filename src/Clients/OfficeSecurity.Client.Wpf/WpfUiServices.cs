@@ -26,4 +26,22 @@ public sealed class WpfUiServices : IUiServices
         var dialog = new Microsoft.Win32.OpenFileDialog { Title = title, Filter = filter, CheckFileExists = true, Multiselect = false };
         return dialog.ShowDialog(Application.Current?.MainWindow) == true ? dialog.FileName : null;
     }
+
+    public string? PickSaveFile(string title, string filter, string suggestedName)
+    {
+        var dialog = new Microsoft.Win32.SaveFileDialog { Title = title, Filter = filter, FileName = suggestedName, OverwritePrompt = true, AddExtension = true };
+        return dialog.ShowDialog(Application.Current?.MainWindow) == true ? dialog.FileName : null;
+    }
+
+    public void OpenFile(string path)
+    {
+        try
+        {
+            using var _ = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(path) { UseShellExecute = true });
+        }
+        catch (System.ComponentModel.Win32Exception)
+        {
+            // No program is set up for this file type; the file is saved and can be opened from File Explorer.
+        }
+    }
 }

@@ -404,13 +404,27 @@
       <ContentControl Content="{Binding}" ContentTemplate="{StaticResource Messages}" />
       <Border Style="{StaticResource Card}">
         <StackPanel>
-          <DockPanel Margin="0,0,0,12">
-            <Button DockPanel.Dock="Right" Content="USB connection log" Command="{Binding UsbLogCommand}" Style="{StaticResource Button.Primary}" />
+          <DockPanel Margin="0,0,0,8">
+            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+              <Button Content="USB connection log" Command="{Binding UsbLogCommand}" Style="{StaticResource Button.Secondary}" />
+              <Button Content="Save as CSV (Excel)..." Command="{Binding ExportCommand}" Style="{StaticResource Button.Primary}" Margin="8,0,0,0"
+                      ToolTip="All events of the chosen days (default: the last 30 days)" />
+            </StackPanel>
             <StackPanel Orientation="Horizontal">
-              <TextBox Text="{Binding Search, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource TextBox.Field}" Width="260" ToolTip="Search by event, computer or details" />
+              <TextBox Text="{Binding Search, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource TextBox.Field}" Width="220" ToolTip="Search by event, computer or details" />
               <Button Content="Search" Command="{Binding ApplyFilterCommand}" IsDefault="True" Style="{StaticResource Button.Secondary}" Margin="8,0,0,0" />
             </StackPanel>
           </DockPanel>
+          <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+            <ComboBox ItemsSource="{Binding SeverityFilters}" SelectedItem="{Binding SeverityFilter}" DisplayMemberPath="Label" Width="140" ToolTip="Severity" />
+            <ComboBox ItemsSource="{Binding TypeFilters}" SelectedItem="{Binding TypeFilter}" DisplayMemberPath="Label" Width="220" Margin="8,0,0,0" ToolTip="Kind of event" />
+            <TextBlock Text="From" Style="{StaticResource Text.Muted}" VerticalAlignment="Center" Margin="12,0,6,0" />
+            <DatePicker SelectedDate="{Binding FromDate}" Width="130" />
+            <TextBlock Text="to" Style="{StaticResource Text.Muted}" VerticalAlignment="Center" Margin="6,0,6,0" />
+            <DatePicker SelectedDate="{Binding ToDate}" Width="130" />
+            <Button Content="Apply" Command="{Binding ApplyFilterCommand}" Style="{StaticResource Button.Secondary}" Margin="8,0,0,0" />
+            <Button Content="Clear filters" Command="{Binding ClearFiltersCommand}" Style="{StaticResource Button.Secondary}" Margin="8,0,0,0" />
+          </StackPanel>
           <DataGrid ItemsSource="{Binding Items}" Style="{StaticResource Grid.Table}" MinHeight="300" MaxHeight="600">
             <DataGrid.Columns>
               <DataGridTextColumn Header="Time" Binding="{Binding OccurredAtUtc, Converter={StaticResource LocalTime}, ConverterParameter='dd MMM yyyy HH:mm:ss'}" Width="160" />

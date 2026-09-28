@@ -75,7 +75,12 @@ public sealed partial class ShellViewModel : ObservableObject
 
     public void ShowEnrollment(MfaEnrollmentResponse enrollment) => Current = new MfaEnrollmentViewModel(this, enrollment);
 
-    public void ShowWorkspace(CurrentUserResponse user) => Current = new WorkspaceViewModel(this, user);
+    public void ShowWorkspace(CurrentUserResponse user)
+    {
+        var workspace = new WorkspaceViewModel(this, user);
+        Current = workspace;
+        _ = workspace.WatchAlertsAsync(); // ends by itself after sign-out
+    }
 
     public void SessionEnded(string message) => ShowLogin(error: message);
 

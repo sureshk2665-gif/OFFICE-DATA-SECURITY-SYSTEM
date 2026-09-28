@@ -119,6 +119,21 @@ Accepted limitations:
   tamper-evident audit log. Whoever can read the server's data folder *and* its protection keys could decrypt
   them; keep the server PC and its backups secured.
 
+## Phase 6 status (ADR-0011)
+- **Alerts** come from the stored events and state, so an attacker who blocks a computer's network still shows
+  up as "Computer not reporting". This rule is suppressed only after a normal Windows shutdown notice. A local
+  administrator who can make Windows send a shutdown notice (i.e. actually shuts the PC down) is not reported,
+  but the computer is then off.
+- **The agent's stop notice** is sent over the same mutually authenticated connection as other events; a
+  computer cannot send notices for another computer.
+- **Reports** can contain personal data (names, sign-in times, file names). Only administrators and auditors
+  can create them, every export is audited with the file's SHA-256, and saved summaries can only be downloaded
+  by file name from the server's own list (no path input). Keep exported files as carefully as the dashboard.
+- **CSV files** neutralise formula-like cells so a crafted device name or file name cannot run as an Excel
+  formula.
+- **Audit log:** checked automatically every 6 hours. Deleting only the newest entries is still not detectable
+  without a copy of the latest fingerprint kept elsewhere (the audit-log report prints it).
+
 ## Residual risks (accepted, documented to owner)
 Local administrators can disable controls. Screenshots, photographs and uploads to *allowed* websites cannot be
 fully prevented without extra DLP products (plan §14).

@@ -11,4 +11,10 @@ public interface IUiServices
     /// <summary>Lets the user choose a file to open; returns its full path, or null when cancelled.</summary>
     /// <param name="filter">File types, e.g. "Installers (*.msi;*.exe)|*.msi;*.exe".</param>
     string? PickFile(string title, string filter);
+
+    /// <summary>Lets the user choose where to save a file; returns its full path, or null when cancelled.</summary>
+    string? PickSaveFile(string title, string filter, string suggestedName);
+
+    /// <summary>Opens a file with the program Windows uses for it (e.g. a PDF reader or Excel).</summary>
+    void OpenFile(string path);
 }

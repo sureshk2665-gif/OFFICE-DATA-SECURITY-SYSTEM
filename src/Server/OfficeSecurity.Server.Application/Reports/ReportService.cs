@@ -378,6 +378,12 @@ public sealed class ReportService(IServerDbContext db, AuditLog audit, TimeProvi
     {
         var check = await audit.VerifyAsync(ct).ConfigureAwait(false);
         facts.Add(new("Integrity check now", (check.IsIntact ? "OK — " : "PROBLEM — ") + check.Message));
+        // Keeping this value elsewhere (e.g. this saved report) lets someone later detect deleted newest entries.
+        var latest = await db.AuditEntries.AsNoTracking().OrderByDescending(e => e.Id).Select(e => new { e.Id, e.Hash }).FirstOrDefaultAsync(ct).ConfigureAwait(false);
+        if (latest is not null)
+        {
+            facts.Add(new("Latest entry and its fingerprint", string.Create(CultureInfo.InvariantCulture, $"#{latest.Id}: {latest.Hash}")));
+        }
         var rows = await db.AuditEntries.AsNoTracking().Where(e => e.OccurredAtUtc >= from && e.OccurredAtUtc < to)
             .OrderBy(e => e.Id).ToListAsync(ct).ConfigureAwait(false);
         return

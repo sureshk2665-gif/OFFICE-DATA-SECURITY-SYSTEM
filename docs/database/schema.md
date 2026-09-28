@@ -29,6 +29,9 @@
 | `deployment_jobs` | Installations: installer, computer, originating request, status (Queued, Running, Succeeded, SucceededRebootRequired, Failed, Cancelled), attempts, exit code, message | Index (`ComputerId`, `Status`); FK `PackageId` (restrict) |
 | `control_exemptions` | Temporary per-computer exceptions: control, reason, start, end, creator, revoked time | Index (`ComputerId`, `ExpiresAtUtc`); FK `ComputerId` (cascade) |
 | `bitlocker_recovery_keys` | BitLocker recovery keys reported by agents: drive, key protector ID, the recovery password **encrypted** with the server's data-protection key (`ProtectedPassword`), first/last reported. Old keys are kept. | Unique (`ComputerId`, `ProtectorId`); FK `ComputerId` (cascade) |
+| `alerts` | Alerts: rule, severity, computer, subject (e.g. account name), title, details, first/last event, count, first/last seen, status (Open, Acknowledged, Resolved), who acknowledged/resolved and when, note | Index (`RuleCode`, `ComputerId`, `Subject`, `Status`) and (`Status`, `LastSeenUtc`); FK `ComputerId` (cascade) |
+| `alert_rules` | Administrator changes to alert rules (enabled, severity, number, minutes, who/when); rules without a row use the defaults in code | PK `Code` |
+| `system_settings` | Small server state values, e.g. `alerts.last-event-id` (how far the alert engine has read) and `alerts.audit-verified-at` | PK `Key` |
 | `audit_log` | Append-only, hash-chained audit trail | Triggers `audit_log_no_update` / `audit_log_no_delete` reject changes; indexes on `OccurredAtUtc`, `Action` |
 
 ## Audit hash chain

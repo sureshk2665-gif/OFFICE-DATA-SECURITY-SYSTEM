@@ -1,0 +1,158 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:vm="clr-namespace:OfficeSecurity.AdminDashboard.ViewModels">
+
+  <ResourceDictionary.MergedDictionaries>
+    <ResourceDictionary Source="pack://application:,,,/OfficeSecurity.Client.Wpf;component/Themes/SharedViews.xaml" />
+  </ResourceDictionary.MergedDictionaries>
+
+  <!-- ============================== security alerts ============================== -->
+  <DataTemplate DataType="{x:Type vm:AlertsViewModel}">
+    <StackPanel>
+      <TextBlock Text="Security Alerts" Style="{StaticResource Text.PageTitle}" />
+      <ContentControl Content="{Binding}" ContentTemplate="{StaticResource Messages}" />
+      <Border Style="{StaticResource Card}">
+        <StackPanel>
+          <TextBlock Style="{StaticResource Text.Muted}" TextWrapping="Wrap" Margin="0,0,0,8"
+                     Text="Things that need your attention. Repeats of the same problem are counted on one alert. 'Acknowledge' shows other administrators that someone is looking at it; 'Resolve' closes it (a new alert is raised if it happens again). Alerts about a computer that is not reporting, a protection that is not working, or a computer waiting for approval close by themselves when the problem is gone." />
+          <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+            <ComboBox ItemsSource="{Binding StatusFilters}" SelectedItem="{Binding StatusFilter}" DisplayMemberPath="Label" Width="190" ToolTip="Status" />
+            <ComboBox ItemsSource="{Binding SeverityFilters}" SelectedItem="{Binding SeverityFilter}" DisplayMemberPath="Label" Width="140" Margin="8,0,0,0" ToolTip="Severity" />
+            <TextBox Text="{Binding Search, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource TextBox.Field}" Width="220" Margin="8,0,0,0" ToolTip="Search in the alert text" />
+            <Button Content="Show" Command="{Binding ApplyFilterCommand}" IsDefault="True" Style="{StaticResource Button.Secondary}" Margin="8,0,0,0" />
+          </StackPanel>
+          <DataGrid ItemsSource="{Binding Items}" SelectedItem="{Binding Selected}" Style="{StaticResource Grid.Table}" MinHeight="200" MaxHeight="420">
+            <DataGrid.Columns>
+              <DataGridTextColumn Header="Last seen" Binding="{Binding LastSeenUtc, Converter={StaticResource LocalTime}}" Width="140" />
+              <DataGridTextColumn Header="Severity" Binding="{Binding Severity}" Width="90" />
+              <DataGridTextColumn Header="Alert" Binding="{Binding Title}" Width="*" />
+              <DataGridTextColumn Header="Times" Binding="{Binding EventCount}" Width="60" />
+              <DataGridTextColumn Header="Status" Binding="{Binding Status}" Width="110" />
+            </DataGrid.Columns>
+          </DataGrid>
+          <DockPanel Margin="0,12,0,0">
+            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+              <Button Content="Previous" Command="{Binding PreviousPageCommand}" Style="{StaticResource Button.Secondary}" />
+              <Button Content="Next" Command="{Binding NextPageCommand}" Style="{StaticResource Button.Secondary}" Margin="8,0,0,0" />
+            </StackPanel>
+            <TextBlock Text="{Binding PageText}" Style="{StaticResource Text.Muted}" VerticalAlignment="Center" />
+          </DockPanel>
+        </StackPanel>
+      </Border>
+
+      <Border Style="{StaticResource Card}" Visibility="{Binding HasSelection, Converter={StaticResource BoolToVisibility}}">
+        <StackPanel>
+          <TextBlock Text="{Binding Selected.Title}" Style="{StaticResource Text.SectionTitle}" TextWrapping="Wrap" />
+          <TextBlock Text="{Binding SelectedText}" Style="{StaticResource Text.Body}" TextWrapping="Wrap" />
+          <StackPanel Visibility="{Binding CanWrite, Converter={StaticResource BoolToVisibility}}" Margin="0,12,0,0">
+            <TextBlock Text="Note (optional, recorded in the audit log)" Style="{StaticResource Text.Label}" />
+            <TextBox Text="{Binding ResolveNote, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource TextBox.Field}" Width="500" HorizontalAlignment="Left" />
+            <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+              <Button Content="Acknowledge" Command="{Binding AcknowledgeCommand}" IsEnabled="{Binding CanAcknowledge}" Style="{StaticResource Button.Secondary}" />
+              <Button Content="Resolve" Command="{Binding ResolveCommand}" IsEnabled="{Binding CanResolve}" Style="{StaticResource Button.Primary}" Margin="8,0,0,0" />
+            </StackPanel>
+          </StackPanel>
+        </StackPanel>
+      </Border>
+
+      <Border Style="{StaticResource Card}">
+        <StackPanel>
+          <TextBlock Text="Alert rules" Style="{StaticResource Text.SectionTitle}" />
+          <TextBlock Style="{StaticResource Text.Muted}" TextWrapping="Wrap" Margin="0,0,0,8"
+                     Text="Select a rule to change it. 'Number' is how many times something must happen (or, for a computer not reporting, how many minutes) and 'Minutes' is the time window it is counted in." />
+          <DataGrid ItemsSource="{Binding Rules}" SelectedItem="{Binding SelectedRule}" Style="{StaticResource Grid.Table}" MaxHeight="360">
+            <DataGrid.Columns>
+              <DataGridCheckBoxColumn Header="On" Binding="{Binding Enabled}" Width="40" />
+              <DataGridTextColumn Header="Rule" Binding="{Binding Name}" Width="230" />
+              <DataGridTextColumn Header="Severity" Binding="{Binding Severity}" Width="90" />
+              <DataGridTextColumn Header="What it means" Binding="{Binding Description}" Width="*">
+                <DataGridTextColumn.ElementStyle>
+                  <Style TargetType="TextBlock">
+                    <Setter Property="TextWrapping" Value="Wrap" />
+                  </Style>
+                </DataGridTextColumn.ElementStyle>
+              </DataGridTextColumn>
+            </DataGrid.Columns>
+          </DataGrid>
+          <StackPanel Margin="0,12,0,0" IsEnabled="{Binding CanWrite}">
+            <StackPanel Orientation="Horizontal" DataContext="{Binding SelectedRule}">
+              <CheckBox Content="On" IsChecked="{Binding Enabled}" VerticalAlignment="Center" />
+              <ComboBox ItemsSource="{Binding Severities}" SelectedItem="{Binding Severity}" Width="120" Margin="12,0,0,0" ToolTip="Severity" />
+              <TextBlock Text="Number" Style="{StaticResource Text.Muted}" VerticalAlignment="Center" Margin="12,0,6,0"
+                         Visibility="{Binding HasThreshold, Converter={StaticResource BoolToVisibility}}" />
+              <TextBox Text="{Binding Threshold, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource TextBox.Field}" Width="70"
+                       Visibility="{Binding HasThreshold, Converter={StaticResource BoolToVisibility}}" ToolTip="{Binding ThresholdMeaning}" />
+              <TextBlock Text="{Binding ThresholdMeaning}" Style="{StaticResource Text.Muted}" VerticalAlignment="Center" Margin="6,0,0,0" />
+              <TextBlock Text="in" Style="{StaticResource Text.Muted}" VerticalAlignment="Center" Margin="12,0,6,0"
+                         Visibility="{Binding UsesWindow, Converter={StaticResource BoolToVisibility}}" />
+              <TextBox Text="{Binding WindowMinutes, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource TextBox.Field}" Width="70"
+                       Visibility="{Binding UsesWindow, Converter={StaticResource BoolToVisibility}}" />
+              <TextBlock Text="minutes" Style="{StaticResource Text.Muted}" VerticalAlignment="Center" Margin="6,0,0,0"
+                         Visibility="{Binding UsesWindow, Converter={StaticResource BoolToVisibility}}" />
+              <TextBlock Text="{Binding LastChange}" Style="{StaticResource Text.Muted}" VerticalAlignment="Center" Margin="16,0,0,0" />
+            </StackPanel>
+            <Button Content="Save rule" Command="{Binding SaveRuleCommand}" Style="{StaticResource Button.Primary}" HorizontalAlignment="Left" Margin="0,8,0,0" />
+          </StackPanel>
+        </StackPanel>
+      </Border>
+    </StackPanel>
+  </DataTemplate>
+
+  <!-- ============================== reports ============================== -->
+  <DataTemplate DataType="{x:Type vm:ReportsViewModel}">
+    <StackPanel>
+      <TextBlock Text="Reports" Style="{StaticResource Text.PageTitle}" />
+      <ContentControl Content="{Binding}" ContentTemplate="{StaticResource Messages}" />
+      <Border Style="{StaticResource Card}">
+        <StackPanel>
+          <TextBlock Text="Create a report" Style="{StaticResource Text.SectionTitle}" />
+          <ListBox ItemsSource="{Binding Types}" SelectedItem="{Binding SelectedType}" MaxHeight="330" BorderThickness="0">
+            <ListBox.ItemTemplate>
+              <DataTemplate>
+                <StackPanel Margin="0,4">
+                  <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
+                  <TextBlock Text="{Binding Description}" Style="{StaticResource Text.Muted}" TextWrapping="Wrap" MaxWidth="800" />
+                </StackPanel>
+              </DataTemplate>
+            </ListBox.ItemTemplate>
+          </ListBox>
+          <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
+            <StackPanel Visibility="{Binding UsesPeriod, Converter={StaticResource BoolToVisibility}}" Orientation="Horizontal">
+              <TextBlock Text="Period" Style="{StaticResource Text.Muted}" VerticalAlignment="Center" Margin="0,0,6,0" />
+              <ComboBox ItemsSource="{Binding Periods}" SelectedItem="{Binding Period}" DisplayMemberPath="Label" Width="160" />
+              <StackPanel Orientation="Horizontal" Visibility="{Binding IsCustomPeriod, Converter={StaticResource BoolToVisibility}}">
+                <DatePicker SelectedDate="{Binding FromDate}" Width="130" Margin="8,0,0,0" />
+                <TextBlock Text="to" Style="{StaticResource Text.Muted}" VerticalAlignment="Center" Margin="6,0,6,0" />
+                <DatePicker SelectedDate="{Binding ToDate}" Width="130" />
+              </StackPanel>
+            </StackPanel>
+            <StackPanel Visibility="{Binding UsesComputer, Converter={StaticResource BoolToVisibility}}" Orientation="Horizontal" Margin="16,0,0,0">
+              <TextBlock Text="Computer" Style="{StaticResource Text.Muted}" VerticalAlignment="Center" Margin="0,0,6,0" />
+              <ComboBox ItemsSource="{Binding Computers}" SelectedItem="{Binding Computer}" DisplayMemberPath="Label" Width="180" />
+            </StackPanel>
+            <ComboBox ItemsSource="{Binding Formats}" SelectedItem="{Binding Format}" DisplayMemberPath="Label" Width="190" Margin="16,0,0,0" ToolTip="File type" />
+          </StackPanel>
+          <Button Content="Create and save..." Command="{Binding CreateCommand}" Style="{StaticResource Button.Primary}" HorizontalAlignment="Left" Margin="0,12,0,0" />
+          <TextBlock Style="{StaticResource Text.Muted}" TextWrapping="Wrap" Margin="0,8,0,0"
+                     Text="Times are shown in the server's time zone. Every report you create is recorded in the audit log with a fingerprint (SHA-256) of the file. PDF reports show Western European characters only; use CSV for names in other scripts." />
+        </StackPanel>
+      </Border>
+
+      <Border Style="{StaticResource Card}">
+        <StackPanel>
+          <TextBlock Text="Automatic weekly and monthly summaries" Style="{StaticResource Text.SectionTitle}" />
+          <TextBlock Style="{StaticResource Text.Muted}" TextWrapping="Wrap" Margin="0,0,0,8"
+                     Text="The server saves a security summary (PDF) every Monday for the week before, and on the 1st of every month for the month before, in its data folder (reports)." />
+          <DataGrid ItemsSource="{Binding SavedReports}" SelectedItem="{Binding SelectedSaved}" Style="{StaticResource Grid.Table}" MinHeight="80" MaxHeight="260">
+            <DataGrid.Columns>
+              <DataGridTextColumn Header="Summary" Binding="{Binding Title}" Width="200" />
+              <DataGridTextColumn Header="File" Binding="{Binding FileName}" Width="*" />
+              <DataGridTextColumn Header="Created" Binding="{Binding CreatedUtc, Converter={StaticResource LocalTime}}" Width="140" />
+            </DataGrid.Columns>
+          </DataGrid>
+          <Button Content="Save selected summary..." Command="{Binding DownloadSavedCommand}" Style="{StaticResource Button.Secondary}" HorizontalAlignment="Left" Margin="0,8,0,0" />
+        </StackPanel>
+      </Border>
+    </StackPanel>
+  </DataTemplate>
+</ResourceDictionary>

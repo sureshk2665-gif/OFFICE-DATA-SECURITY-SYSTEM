@@ -137,6 +137,14 @@ jobs:
           name: windows-service-test-results
           path: TestResults/windows-service.trx
 
+      - name: Upload sample reports made by the end-to-end test (PDF and CSV)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sample-reports
+          path: tests/OfficeSecurity.Server.IntegrationTests/bin/Release/net10.0/reports/
+          if-no-files-found: warn
+
       - name: Upload executables
         uses: actions/upload-artifact@v4
         with:

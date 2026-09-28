@@ -116,13 +116,44 @@ STEP 8 - Security policies (what is blocked)
 
 STEP 8b - Events
   "Security Events": everything the computers report. "USB connection log" shows USB
-  drives, phones and Bluetooth devices being connected.
+  drives, phones and Bluetooth devices being connected. Filter by severity, kind of event
+  and dates; "Save as CSV (Excel)..." saves the events of those days.
+
+STEP 8c - Security alerts (what needs your attention)
+  The sidebar shows the number of new alerts, e.g. "Security Alerts (3, 1 critical)"; it is
+  refreshed every 30 seconds while the dashboard is open. There is no e-mail.
+  Open "Security Alerts", select an alert to see the details, then:
+    - "Acknowledge": other administrators see that you are looking at it.
+    - "Resolve" (with a note if you like): closes it. If it happens again, a new alert appears.
+  Repeats of the same problem are counted on one alert ("Times").
+  Alerts about a computer not reporting, a protection not working, or a computer waiting for
+  approval close by themselves when the problem is gone.
+  A computer that is switched off normally does NOT raise an alert. "Agent stopped" means
+  someone stopped the security agent while Windows kept running - check that computer.
+  (Uninstalling the agent also stops it, so you get this alert then too: resolve it with the
+  note "uninstalled".)
+  "Alert rules" (bottom of the page): switch a rule off, or change its severity and numbers
+  (for example "5 failed sign-ins in 15 minutes"). Select the rule, change it, "Save rule".
+
+STEP 8d - Reports (PDF or Excel)
+  "Reports": choose a report, the period (last 7 days, last month, your own dates...) and,
+  for some reports, one computer; choose PDF (to read or print) or CSV (for Excel) and click
+  "Create and save...". Available: security summary, blocked activity, USB drives and devices,
+  sign-ins, company folder file access, installed software, software requests, alerts,
+  computers and protection status, all events, audit log.
+  Every Monday the server also saves a weekly security summary, and on the 1st of every month
+  a monthly one (folder C:\ProgramData\OfficeSecurity\Server\reports). They are listed under
+  "Automatic weekly and monthly summaries" - select one and click "Save selected summary...".
+  Every report you create is recorded in the audit log.
+  Keep the monthly "Audit log" report somewhere else (e.g. a USB drive in a safe): its
+  "Latest entry and its fingerprint" lets you prove later that nothing was deleted.
 
 STEP 9 - Software: approved list, installers, requests
   "Software Management":
     - "Programs found on approved computers" lists every program the computers report
       (as in Windows "Installed apps"). Tick "Only programs not on the approved list" to
-      see what staff installed without approval. Nothing is removed or blocked yet (Phase 5).
+      see what staff installed without approval (an alert is raised when one appears).
+      Programs are not removed automatically.
     - "Add program" puts a program on the approved list (name as shown in Installed apps;
       the start of the name is enough).
     - Select a program, click "Upload installer..." and choose its .msi or .exe file.
@@ -138,7 +169,8 @@ STEP 9 - Software: approved list, installers, requests
 
 STEP 10 - Look at the audit log
   In the dashboard open "Audit Logs". Every sign-in, failed sign-in and account change is listed.
-  Click "Verify integrity" to check that nobody has altered the log.
+  Click "Verify integrity" to check that nobody has altered the log. The server also checks this
+  by itself every 6 hours and raises a Critical alert if the log was altered.
 
 Removing the agent from a computer (administrator Command Prompt):
   "C:\Program Files\OfficeSecurity\Agent\OfficeSecurity.Agent.exe" uninstall

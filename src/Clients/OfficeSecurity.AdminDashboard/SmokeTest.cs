@@ -117,6 +117,20 @@ internal static class SmokeTest
             policies.ApprovedDevices.Add(new ApprovedDevice(@"USBSTOR\DISK", "Accounts backup drive", DateTimeOffset.UtcNow.AddDays(30), @"USB\VID_0781"));
             return policies;
         });
+        Check("Security alerts with details and rules", () =>
+        {
+            var alerts = new AlertsViewModel(shell, canWrite: true);
+            alerts.ShowSampleForSelfTest();
+            alerts.SelectedRule = alerts.Rules[0];
+            return alerts;
+        });
+        Check("Reports", () =>
+        {
+            var reports = new ReportsViewModel(shell);
+            reports.ShowSampleForSelfTest();
+            return reports;
+        });
+        Check("Security events with filters", () => new EventsViewModel(shell));
 
         log.AppendLine(failures == 0 ? "RESULT: all screens built successfully" : string.Create(CultureInfo.InvariantCulture, $"RESULT: {failures} screen(s) failed"));
         if (!string.IsNullOrEmpty(logPath))

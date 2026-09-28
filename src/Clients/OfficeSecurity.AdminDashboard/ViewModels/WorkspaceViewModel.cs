@@ -11,6 +11,9 @@ public abstract class SectionViewModel(string title) : BusyViewModel
 {
     public string Title { get; } = title;
 
+    /// <summary>The name in the sidebar (a page may add a count, e.g. open alerts).</summary>
+    public virtual string NavTitle => Title;
+
     /// <summary>Loads data when the page is opened.</summary>
     public virtual Task ActivateAsync() => Task.CompletedTask;
 }
@@ -52,14 +55,13 @@ public sealed partial class WorkspaceViewModel : ObservableObject
         sections.AddRange(
         [
             new PoliciesViewModel(shell, canWrite),
-            new PlannedSectionViewModel("USB Device Control", 5, "Block removable storage and phones; approve specific USB devices by hardware ID."),
             new SoftwareViewModel(shell, canWrite),
             new SoftwareRequestsViewModel(shell, canWrite),
-            new PlannedSectionViewModel("File Safety", 5, "Protected company folders, file access auditing, and backup status."),
+            Alerts = new AlertsViewModel(shell, canWrite),
             new EventsViewModel(shell),
-            new PlannedSectionViewModel("Security Alerts", 6, "Alerts for blocked devices, failed logins, stopped agents and policy violations."),
+            new ReportsViewModel(shell),
             new AuditViewModel(shell),
-            new PlannedSectionViewModel("Reports", 6, "USB, blocked transfer, software, login and weekly/monthly security reports (CSV/PDF)."),
+            new PlannedSectionViewModel("Backup", 7, "Backup of company files and of the server, with the status of each backup. (Protected company folders, file access records and ransomware protection are set in 'Security Policies'.)"),
             new SettingsViewModel(shell),
         ]);
 
@@ -70,6 +72,25 @@ public sealed partial class WorkspaceViewModel : ObservableObject
 
         Sections = new ObservableCollection<SectionViewModel>(sections);
         SelectedSection = sections[0];
+    }
+
+    /// <summary>The alerts page; its sidebar entry shows the number of new alerts.</summary>
+    public AlertsViewModel Alerts { get; }
+
+    /// <summary>Keeps the alert count in the sidebar current (every 30 seconds) while this workspace is shown.</summary>
+    public async Task WatchAlertsAsync()
+    {
+        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(30));
+        do
+        {
+            if (!ReferenceEquals(_shell.Current, this) || _shell.Api.CurrentUser is null)
+            {
+                return; // signed out, or the session ended
+            }
+
+            await Alerts.RefreshSummaryAsync();
+        }
+        while (await timer.WaitForNextTickAsync().ConfigureAwait(true));
     }
 
     public CurrentUserResponse User { get; }

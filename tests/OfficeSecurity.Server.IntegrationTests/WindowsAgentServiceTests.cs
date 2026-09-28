@@ -48,6 +48,7 @@ public sealed partial class WindowsAgentServiceTests(ITestOutputHelper output)
         server.StartRealHttps();
         var owner = await server.OwnerTokenAsync();
         using var admin = server.Client(owner);
+        await server.RunAlertEngineAsync(); // the alert engine starts reading events from here
 
         // Faster heartbeats so the test completes quickly.
         var defaultPolicy = Assert.Single((await admin.GetFromJsonAsync<List<PolicySummary>>(ApiRoutes.Policies))!, p => p.IsDefault);
@@ -131,6 +132,9 @@ public sealed partial class WindowsAgentServiceTests(ITestOutputHelper output)
 
             // 11. Part 3: approved USB drives, Wi-Fi restriction, Bluetooth, and the self-check command.
             await Part3Async(admin, defaultPolicy.Id, pending.Id, exe);
+
+            // 12. Phase 6: alerts from everything above, and reports built from the real events.
+            await AlertsAndReportsAsync(server, admin, pending.Id);
         }
         finally
         {
@@ -419,6 +423,51 @@ public sealed partial class WindowsAgentServiceTests(ITestOutputHelper output)
         await WaitForAsync(() => Task.FromResult(HklmValue(UsbKey, "Deny_Read") is 1 && HklmValue(ApprovedDevicesEnforcer.Key, "AllowDenyLayered") is null ? (bool?)true : null),
             TimeSpan.FromSeconds(90), "blanket USB denial back");
         output.WriteLine("Approvals removed: all USB drives denied again; device installation settings removed.");
+    }
+
+    private async Task AlertsAndReportsAsync(ServerFactory server, HttpClient admin, Guid computerId)
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        await server.RunAlertEngineAsync();
+        var alerts = (await admin.GetFromJsonAsync<PagedResult<AlertResponse>>($"{ApiRoutes.Alerts}?status=All&pageSize=200"))!.Items;
+        foreach (var alert in alerts)
+        {
+            output.WriteLine($"  alert [{alert.Severity}] {alert.Title} ×{alert.EventCount} ({alert.Status}) — {alert.Details}");
+        }
+
+        // The tampering in step 8, the program blocked in part 2, and the service stopped with "sc stop" in part 2
+        // (the real service sent its stop notice through the Windows service control manager).
+        Assert.Contains(alerts, a => a.RuleCode == "tamper" && a.ComputerId == computerId && a.EventCount >= 2);
+        Assert.Contains(alerts, a => a.RuleCode == "program-blocked" && a.ComputerId == computerId);
+        var stopped = Assert.Single(alerts, a => a.RuleCode == "agent-stopped" && a.ComputerId == computerId);
+        Assert.Contains("stopped while Windows kept running", stopped.Details, StringComparison.Ordinal);
+        Assert.DoesNotContain(alerts, a => a.RuleCode == "computer-not-reporting");
+
+        var range = $"from={Uri.EscapeDataString(DateTimeOffset.UtcNow.AddDays(-1).ToString("O"))}&to={Uri.EscapeDataString(DateTimeOffset.UtcNow.AddDays(1).ToString("O"))}";
+        var reportsFolder = Directory.CreateDirectory(Path.Combine(AppContext.BaseDirectory, "reports")).FullName;
+        foreach (var (type, format) in new[] { ("security-summary", "pdf"), ("blocked", "csv"), ("blocked", "pdf"), ("alerts", "pdf") })
+        {
+            var response = await admin.GetAsync(new Uri($"{ApiRoutes.Report(type)}?{range}&format={format}", UriKind.Relative));
+            response.EnsureSuccessStatusCode();
+            var content = await response.Content.ReadAsByteArrayAsync();
+            var file = Path.Combine(reportsFolder, $"e2e-{type}.{format}");
+            await File.WriteAllBytesAsync(file, content);
+            output.WriteLine($"  report {type}.{format}: {content.Length} bytes → {file}");
+            if (format == "csv")
+            {
+                var lines = System.Text.Encoding.UTF8.GetString(content).Split("\r\n", StringSplitOptions.RemoveEmptyEntries);
+                output.WriteLine($"    {lines.Length - 1} blocked-activity rows; first: {(lines.Length > 1 ? lines[1] : "(none)")}");
+                Assert.True(lines.Length > 1);
+            }
+            else
+            {
+                Assert.StartsWith("%PDF", System.Text.Encoding.Latin1.GetString(content, 0, 4), StringComparison.Ordinal);
+            }
+        }
     }
 
     private static string TryStartAndStop(string exe)
