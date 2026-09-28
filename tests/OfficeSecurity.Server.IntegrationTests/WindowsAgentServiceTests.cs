@@ -354,12 +354,17 @@ public sealed partial class WindowsAgentServiceTests(ITestOutputHelper output)
             output.WriteLine("fsquirt.exe is not present on this Windows edition; the deny rule could not be tried for real.");
         }
 
-        // The agent itself still starts under enforcement.
+        // The agent itself still starts under enforcement. Just before stopping it, another unapproved program is
+        // tried: that block must still reach the server (after the restart), however quickly the agent is stopped.
+        var lateProbe = Path.Combine(Path.GetDirectoryName(userProbe)!, "late-probe.exe");
+        File.Copy(userProbe, lateProbe);
+        output.WriteLine($"Blocked program run just before the service stop → {await TryRunAsync(lateProbe, "help")}");
         await ScAsync("stop", "OfficeSecurityAgent");
         await WaitForAsync(async () => (await ScAsync("query", "OfficeSecurityAgent")).Contains("STOPPED", StringComparison.Ordinal) ? (bool?)true : null, TimeSpan.FromSeconds(60), "service stopped");
         await ScAsync("start", "OfficeSecurityAgent");
         await WaitForAsync(async () => await ServicePidAsync() is not 0 ? (bool?)true : null, TimeSpan.FromSeconds(60), "service running again under Application Control");
         await WaitForControlsAsync(admin, computerId, "agent reporting again after the restart", c => c[SecurityControl.ApplicationControl] == ControlState.Enforced);
+        _lateBlockReported = await BlockReportedAsync(admin, computerId, "late-probe.exe");
 
         // Off: the policy is removed again.
         await SavePolicyAsync(admin, policyId, s => s with { ApplicationControl = new ApplicationControlSettings() });
@@ -474,6 +479,7 @@ public sealed partial class WindowsAgentServiceTests(ITestOutputHelper output)
         }
 
         Assert.True(_blockReported, "The program blocked by Application Control was not reported to the server (see the Code Integrity events above).");
+        Assert.True(_lateBlockReported, "A program blocked just before the agent service was stopped was not reported after the restart (see the Code Integrity events above).");
     }
 
     private static string TryStartAndStop(string exe)
@@ -511,19 +517,21 @@ public sealed partial class WindowsAgentServiceTests(ITestOutputHelper output)
     }
 
     private bool _blockReported;
+    private bool _lateBlockReported;
 
     /// <summary>
     /// Waits for the "Blocked by Application Control" event. If it does not arrive, prints what Windows logged in
     /// the Code Integrity log so the cause is visible, and lets the rest of the test run (it fails at the end).
     /// </summary>
-    private async Task<bool> BlockReportedAsync(HttpClient admin, Guid computerId)
+    private async Task<bool> BlockReportedAsync(HttpClient admin, Guid computerId, string program = "probe.exe")
     {
         var watch = Stopwatch.StartNew();
         while (watch.Elapsed < TimeSpan.FromSeconds(120))
         {
             var e = await admin.GetFromJsonAsync<PagedResult<SecurityEventResponse>>(
                 $"{ApiRoutes.Events}?computerId={computerId}&type={nameof(SecurityEventType.UnauthorizedApplicationBlocked)}&pageSize=200");
-            if (e!.Items.FirstOrDefault(x => x.Details!.StartsWith("Blocked by Application Control:", StringComparison.Ordinal)) is { } match)
+            if (e!.Items.FirstOrDefault(x => x.Details!.StartsWith("Blocked by Application Control:", StringComparison.Ordinal)
+                    && x.Details.Contains("\\" + program, StringComparison.OrdinalIgnoreCase)) is { } match)
             {
                 output.WriteLine($"  event {match.EventType} ({match.Severity}): {match.Details}  [after {watch.Elapsed.TotalSeconds:0} s]");
                 return true;
