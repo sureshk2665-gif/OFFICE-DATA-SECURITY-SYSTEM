@@ -49,7 +49,9 @@ public sealed class PolicyDefinitionTests(ITestOutputHelper output)
             var match = definitions.FirstOrDefault(d => string.Equals(d.Key, parts[0], StringComparison.OrdinalIgnoreCase)
                 && string.Equals(d.ValueName, parts[1], StringComparison.OrdinalIgnoreCase)
                 && (d.Value is null || d.Value == (int)data));
-            Assert.True(match is not null, $@"HKLM\{parts[0]}\{parts[1]} = {data} is not defined in {files}");
+            var candidates = definitions.Where(d => string.Equals(d.Key, parts[0], StringComparison.OrdinalIgnoreCase) && string.Equals(d.ValueName, parts[1], StringComparison.OrdinalIgnoreCase))
+                .Select(d => $"{d.Value?.ToString(CultureInfo.InvariantCulture) ?? "any number"} = '{d.Display}' (policy {d.Policy})");
+            Assert.True(match is not null, $@"HKLM\{parts[0]}\{parts[1]} = {data} is not defined in {files}. Defined: {string.Join(" | ", candidates)}");
             output.WriteLine($@"OK  HKLM\{parts[0]}\{parts[1]} = {data}  →  policy '{match.Policy}': {match.Display}");
         }
     }

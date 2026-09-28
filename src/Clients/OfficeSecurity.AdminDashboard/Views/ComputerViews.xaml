@@ -91,23 +91,22 @@
 
         <Border Style="{StaticResource Card}">
           <StackPanel>
-            <TextBlock Text="Security controls reported by the agent" Style="{StaticResource Text.SectionTitle}" />
+            <TextBlock Text="Security protections on this computer" Style="{StaticResource Text.SectionTitle}" />
             <TextBlock Style="{StaticResource Text.Muted}" Margin="0,0,0,8" TextWrapping="Wrap"
-                       Text="Each control shows its verified state on this computer. 'NotImplemented' means the protection is not built yet (Phase 5); nothing is blocked until a control shows 'Enforced'." />
-            <ItemsControl ItemsSource="{Binding Detail.Controls}">
-              <ItemsControl.ItemsPanel>
-                <ItemsPanelTemplate>
-                  <UniformGrid Columns="3" />
-                </ItemsPanelTemplate>
-              </ItemsControl.ItemsPanel>
-              <ItemsControl.ItemTemplate>
-                <DataTemplate>
-                  <TextBlock Style="{StaticResource Text.Body}" Margin="0,2">
-                    <Run Text="{Binding Control, Mode=OneWay}" FontWeight="SemiBold" /><Run Text=": " /><Run Text="{Binding State, Mode=OneWay}" />
-                  </TextBlock>
-                </DataTemplate>
-              </ItemsControl.ItemTemplate>
-            </ItemsControl>
+                       Text="What the agent has verified on this computer. 'On (verified)' means Windows reports the protection as applied. The agent checks every minute and puts back anything someone changed (you will see a Critical 'PolicyTamperAttempt' event)." />
+            <DataGrid ItemsSource="{Binding ControlRows}" Style="{StaticResource Grid.Table}" MaxHeight="420">
+              <DataGrid.Columns>
+                <DataGridTextColumn Header="Protection" Binding="{Binding Name}" Width="230" />
+                <DataGridTextColumn Header="State" Binding="{Binding State}" Width="170" />
+                <DataGridTextColumn Header="Details" Binding="{Binding Details}" Width="*">
+                  <DataGridTextColumn.ElementStyle>
+                    <Style TargetType="TextBlock">
+                      <Setter Property="TextWrapping" Value="Wrap" />
+                    </Style>
+                  </DataGridTextColumn.ElementStyle>
+                </DataGridTextColumn>
+              </DataGrid.Columns>
+            </DataGrid>
           </StackPanel>
         </Border>
 
@@ -124,6 +123,34 @@
                 <DataGridTextColumn Header="Hardware ID" Binding="{Binding InstanceId}" Width="260" />
               </DataGrid.Columns>
             </DataGrid>
+          </StackPanel>
+        </Border>
+
+        <Border Style="{StaticResource Card}">
+          <StackPanel>
+            <TextBlock Text="Temporary exceptions" Style="{StaticResource Text.SectionTitle}" />
+            <TextBlock Style="{StaticResource Text.Muted}" Margin="0,0,0,8" TextWrapping="Wrap"
+                       Text="Switch one protection off on this computer only, for a limited time (for example to let someone copy files from a USB drive). It switches back on by itself. Every exception is recorded in the audit log." />
+            <DataGrid ItemsSource="{Binding Exemptions}" SelectedItem="{Binding SelectedExemption}" Style="{StaticResource Grid.Table}" MinHeight="60" MaxHeight="180">
+              <DataGrid.Columns>
+                <DataGridTextColumn Header="Protection" Binding="{Binding Control}" Width="160" />
+                <DataGridCheckBoxColumn Header="Active" Binding="{Binding IsActive}" Width="60" />
+                <DataGridTextColumn Header="Until" Binding="{Binding ExpiresAtUtc, Converter={StaticResource LocalTime}}" Width="140" />
+                <DataGridTextColumn Header="Reason" Binding="{Binding Reason}" Width="*" />
+                <DataGridTextColumn Header="By" Binding="{Binding CreatedBy}" Width="120" />
+              </DataGrid.Columns>
+            </DataGrid>
+            <StackPanel Visibility="{Binding CanWrite, Converter={StaticResource BoolToVisibility}}" Margin="0,12,0,0">
+              <StackPanel Orientation="Horizontal">
+                <ComboBox ItemsSource="{Binding ExemptionControls}" SelectedItem="{Binding ExemptionControl}" DisplayMemberPath="Label" Width="260" ToolTip="What to allow" />
+                <ComboBox ItemsSource="{Binding ExemptionDurations}" SelectedItem="{Binding ExemptionDuration}" DisplayMemberPath="Label" Width="130" Margin="8,0,0,0" ToolTip="For how long" />
+                <TextBox Text="{Binding ExemptionReason, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource TextBox.Field}" Width="260" Margin="8,0,0,0" ToolTip="Reason (recorded in the audit log)" />
+              </StackPanel>
+              <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                <Button Content="Allow temporarily" Command="{Binding CreateExemptionCommand}" Style="{StaticResource Button.Primary}" />
+                <Button Content="End selected exception now" Command="{Binding EndExemptionCommand}" IsEnabled="{Binding CanEndExemption}" Style="{StaticResource Button.Secondary}" Margin="8,0,0,0" />
+              </StackPanel>
+            </StackPanel>
           </StackPanel>
         </Border>
 
@@ -218,7 +245,7 @@
       <TextBlock Text="Security Policies" Style="{StaticResource Text.PageTitle}" />
       <Border Style="{StaticResource Banner.Info}">
         <TextBlock Style="{StaticResource Text.Body}" TextWrapping="Wrap"
-                   Text="Policies are signed and delivered to computers now. The Windows protections they switch on are built in Phase 5: until then computers report each control as 'Not implemented' and nothing is blocked." />
+                   Text="Each computer applies its policy within a minute of its next check-in and reports, per protection, what Windows has actually applied (Computers → select a computer). Protections marked 'not available yet' are saved but have no effect in this version. Try a new protection on one computer (a separate policy) before giving it to everyone." />
       </Border>
       <ContentControl Content="{Binding}" ContentTemplate="{StaticResource Messages}" />
 
@@ -259,21 +286,30 @@
               <TextBlock Text="Check-in interval (seconds, 15–3600)" Style="{StaticResource Text.Label}" />
               <TextBox Text="{Binding HeartbeatSeconds, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource TextBox.Field}" Width="120" HorizontalAlignment="Left" />
 
-              <TextBlock Text="USB storage and external disks" Style="{StaticResource Text.SectionTitle}" Margin="0,16,0,4" />
+              <TextBlock Text="USB drives and memory cards" Style="{StaticResource Text.SectionTitle}" Margin="0,16,0,4" />
               <ComboBox ItemsSource="{Binding EnforcementModes}" SelectedItem="{Binding RemovableStorageMode}" Width="160" HorizontalAlignment="Left" />
-              <CheckBox Content="Also block phones and cameras (file transfer)" IsChecked="{Binding BlockPortableDevices}" Margin="0,6,0,0" />
+              <CheckBox Content="Also block phones and cameras (file transfer; charging still works)" IsChecked="{Binding BlockPortableDevices}" Margin="0,6,0,0" />
               <CheckBox Content="Also block CD/DVD drives" IsChecked="{Binding BlockOpticalDrives}" Margin="0,4,0,0" />
+              <TextBlock Style="{StaticResource Text.Muted}" TextWrapping="Wrap" Margin="0,4,0,0"
+                         Text="Keyboards, mice and printers keep working. Applies to every user, including administrators. To allow a USB drive on one computer for a while, use 'Temporary exceptions' on the computer's page." />
 
-              <TextBlock Text="Bluetooth" Style="{StaticResource Text.SectionTitle}" Margin="0,16,0,4" />
+              <TextBlock Text="Software installation by staff" Style="{StaticResource Text.SectionTitle}" Margin="0,16,0,4" />
+              <CheckBox Content="Stop staff installing programs for themselves (Windows Installer and Store apps)" IsChecked="{Binding BlockStaffInstalls}" />
+              <TextBlock Style="{StaticResource Text.Muted}" TextWrapping="Wrap" Margin="0,4,0,0"
+                         Text="Installations you approve in 'Software Management' still work. Portable programs are not stopped until Application Control is available." />
+
+              <TextBlock Text="Bluetooth (not available yet — no effect)" Style="{StaticResource Text.SectionTitle}" Margin="0,16,0,4" />
               <ComboBox ItemsSource="{Binding BluetoothModes}" SelectedItem="{Binding BluetoothMode}" Width="200" HorizontalAlignment="Left" />
 
-              <TextBlock Text="Unapproved programs" Style="{StaticResource Text.SectionTitle}" Margin="0,16,0,4" />
+              <TextBlock Text="Unapproved programs (Application Control — not available yet, no effect)" Style="{StaticResource Text.SectionTitle}" Margin="0,16,0,4" TextWrapping="Wrap" />
               <ComboBox ItemsSource="{Binding EnforcementModes}" SelectedItem="{Binding ApplicationControlMode}" Width="160" HorizontalAlignment="Left" />
               <CheckBox Content="Block programs started from Downloads, AppData and other user folders" IsChecked="{Binding BlockUserWritableLocations}" Margin="0,6,0,0" />
             </StackPanel>
 
             <StackPanel Grid.Column="2">
-              <TextBlock Text="Web browsers" Style="{StaticResource Text.SectionTitle}" Margin="0,8,0,4" />
+              <TextBlock Text="Web browsers (Edge, Chrome, Firefox)" Style="{StaticResource Text.SectionTitle}" Margin="0,8,0,4" />
+              <TextBlock Style="{StaticResource Text.Muted}" TextWrapping="Wrap" Margin="0,0,0,4"
+                         Text="'wetransfer.com' also covers its subdomains. To allow only some websites, put * under Blocked and the sites under Allowed. Other browsers are not restricted." />
               <CheckBox Content="Disable private/incognito browsing" IsChecked="{Binding DisablePrivateBrowsing}" />
               <TextBlock Text="Blocked websites (one per line, e.g. wetransfer.com)" Style="{StaticResource Text.Label}" />
               <TextBox Text="{Binding BlockedUrls, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True" Height="70" VerticalScrollBarVisibility="Auto" />
@@ -281,12 +317,12 @@
               <TextBox Text="{Binding AllowedUrls, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True" Height="70" VerticalScrollBarVisibility="Auto" />
 
               <TextBlock Text="Network" Style="{StaticResource Text.SectionTitle}" Margin="0,16,0,4" />
-              <TextBlock Text="Allowed Wi-Fi networks (one per line; empty = any)" Style="{StaticResource Text.Label}" />
+              <TextBlock Text="Allowed Wi-Fi networks (not available yet — no effect)" Style="{StaticResource Text.Label}" />
               <TextBox Text="{Binding AllowedWifiNetworks, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True" Height="50" VerticalScrollBarVisibility="Auto" />
-              <TextBlock Text="Programs without internet access (full path, one per line)" Style="{StaticResource Text.Label}" />
+              <TextBlock Text="Programs without network access (full path, one per line, e.g. C:\Program Files\Dropbox\Client\Dropbox.exe)" Style="{StaticResource Text.Label}" TextWrapping="Wrap" />
               <TextBox Text="{Binding BlockedApplications, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True" Height="50" VerticalScrollBarVisibility="Auto" />
 
-              <TextBlock Text="Company folders" Style="{StaticResource Text.SectionTitle}" Margin="0,16,0,4" />
+              <TextBlock Text="Company folders (not available yet — no effect)" Style="{StaticResource Text.SectionTitle}" Margin="0,16,0,4" />
               <TextBlock Text="Protected folders (full path, one per line, e.g. D:\Company)" Style="{StaticResource Text.Label}" />
               <TextBox Text="{Binding ProtectedFolders, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True" Height="50" VerticalScrollBarVisibility="Auto" />
               <CheckBox Content="Record who opens files in these folders" IsChecked="{Binding AuditProtectedFolders}" Margin="0,6,0,0" />

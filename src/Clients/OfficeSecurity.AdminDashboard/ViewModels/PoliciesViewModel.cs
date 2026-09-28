@@ -68,6 +68,9 @@ public sealed partial class PoliciesViewModel(ShellViewModel shell, bool canWrit
     public partial bool DisablePrivateBrowsing { get; set; }
 
     [ObservableProperty]
+    public partial bool BlockStaffInstalls { get; set; }
+
+    [ObservableProperty]
     public partial string BlockedUrls { get; set; } = string.Empty;
 
     [ObservableProperty]
@@ -170,6 +173,7 @@ public sealed partial class PoliciesViewModel(ShellViewModel shell, bool canWrit
         ApplicationControlMode = s.ApplicationControl.Mode;
         BlockUserWritableLocations = s.ApplicationControl.BlockUserWritableLocations;
         DisablePrivateBrowsing = s.Browser.DisablePrivateBrowsing;
+        BlockStaffInstalls = s.SoftwareInstallation.BlockStaffInstalls;
         BlockedUrls = Lines(s.Browser.BlockedUrls);
         AllowedUrls = Lines(s.Browser.AllowedUrls);
         AllowedWifiNetworks = Lines(s.Network.AllowedWifiNetworks);
@@ -186,6 +190,7 @@ public sealed partial class PoliciesViewModel(ShellViewModel shell, bool canWrit
         RemovableStorage = _loaded.RemovableStorage with { Mode = RemovableStorageMode, BlockPortableDevices = BlockPortableDevices, BlockOpticalDrives = BlockOpticalDrives },
         Bluetooth = _loaded.Bluetooth with { Mode = BluetoothMode },
         ApplicationControl = _loaded.ApplicationControl with { Mode = ApplicationControlMode, BlockUserWritableLocations = BlockUserWritableLocations },
+        SoftwareInstallation = _loaded.SoftwareInstallation with { BlockStaffInstalls = BlockStaffInstalls },
         Browser = _loaded.Browser with { DisablePrivateBrowsing = DisablePrivateBrowsing, BlockedUrls = Split(BlockedUrls), AllowedUrls = Split(AllowedUrls) },
         Network = _loaded.Network with { AllowedWifiNetworks = Split(AllowedWifiNetworks), BlockedApplicationPaths = Split(BlockedApplications) },
         FileProtection = new FileProtectionSettings

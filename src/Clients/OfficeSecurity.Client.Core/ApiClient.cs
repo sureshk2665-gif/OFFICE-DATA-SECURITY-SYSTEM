@@ -237,6 +237,15 @@ public sealed class ApiClient : IDisposable
     public Task<PagedResult<SecurityEventResponse>> ListEventsAsync(int page, int pageSize, Guid? computerId, string? search, CancellationToken ct = default) =>
         SendAsync<PagedResult<SecurityEventResponse>>(HttpMethod.Get, ApiRoutes.Events + Query(("page", page), ("pageSize", pageSize), ("computerId", computerId), ("search", search)), null, ct);
 
+    public Task<List<ExemptionResponse>> ListExemptionsAsync(Guid computerId, CancellationToken ct = default) =>
+        SendAsync<List<ExemptionResponse>>(HttpMethod.Get, ApiRoutes.ComputerExemptions(computerId), null, ct);
+
+    public Task<ExemptionResponse> CreateExemptionAsync(Guid computerId, CreateExemptionRequest request, CancellationToken ct = default) =>
+        SendAsync<ExemptionResponse>(HttpMethod.Post, ApiRoutes.ComputerExemptions(computerId), request, ct);
+
+    public Task EndExemptionAsync(Guid computerId, Guid exemptionId, CancellationToken ct = default) =>
+        SendAsync<object>(HttpMethod.Delete, ApiRoutes.ComputerExemptionById(computerId, exemptionId), null, ct);
+
     public Task<List<PolicySummary>> ListPoliciesAsync(CancellationToken ct = default) =>
         SendAsync<List<PolicySummary>>(HttpMethod.Get, ApiRoutes.Policies, null, ct);
 

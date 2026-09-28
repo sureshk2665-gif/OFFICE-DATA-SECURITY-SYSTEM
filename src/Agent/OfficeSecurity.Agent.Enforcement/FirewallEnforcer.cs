@@ -1,6 +1,5 @@
 using System.Globalization;
 using System.Reflection;
-using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
 using System.Security.Cryptography;
 using System.Text;
@@ -218,8 +217,9 @@ public sealed class WindowsFirewall : IFirewall
         {
             rule = Call(rules, "Item", name)!;
         }
-        catch (COMException ex) when (ex.HResult == ElementNotFound)
+        catch (Exception ex) when (ex.HResult == ElementNotFound)
         {
+            // .NET surfaces the API's "not found" (0x80070002) as FileNotFoundException.
             return null;
         }
 
@@ -261,9 +261,10 @@ public sealed class WindowsFirewall : IFirewall
         {
             return target.GetType().InvokeMember(method, BindingFlags.InvokeMethod, null, target, args, CultureInfo.InvariantCulture);
         }
-        catch (TargetInvocationException ex) when (ex.InnerException is COMException com)
+        catch (TargetInvocationException ex) when (ex.InnerException is not null)
         {
-            throw com;
+            System.Runtime.ExceptionServices.ExceptionDispatchInfo.Throw(ex.InnerException);
+            throw;
         }
     }
 }

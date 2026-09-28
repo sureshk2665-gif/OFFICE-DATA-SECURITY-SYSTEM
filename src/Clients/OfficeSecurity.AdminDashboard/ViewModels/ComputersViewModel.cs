@@ -61,8 +61,42 @@ public sealed partial class ComputersViewModel(ShellViewModel shell, bool canWri
     public bool IsSelectedTrusted => Selected?.Status == ComputerStatuses.Trusted;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(HasDetail), nameof(HardwareText))]
+    [NotifyPropertyChangedFor(nameof(HasDetail), nameof(HardwareText), nameof(ControlRows))]
     public partial ComputerDetail? Detail { get; set; }
+
+    /// <summary>The protections this computer reports, most important first.</summary>
+    public IReadOnlyList<ControlRow> ControlRows => Detail is null
+        ? []
+        : Detail.Controls
+            .OrderBy(c => c.State switch { ControlState.Failed => 0, ControlState.TemporarilyAllowed => 1, ControlState.NotImplemented => 9, _ => 2 })
+            .Select(c => new ControlRow(ControlNames.Of(c.Control), ControlNames.Of(c.State), c.Details, c.State is ControlState.Failed or ControlState.TemporarilyAllowed))
+            .ToList();
+
+    // ---- temporary exceptions
+    public ObservableCollection<ExemptionResponse> Exemptions { get; } = [];
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanEndExemption))]
+    public partial ExemptionResponse? SelectedExemption { get; set; }
+
+    public bool CanEndExemption => CanWrite && SelectedExemption is { IsActive: true };
+
+    public IReadOnlyList<NamedChoice<SecurityControl>> ExemptionControls { get; } =
+        [.. Contracts.Exemptions.AllowedControls.Select(c => new NamedChoice<SecurityControl>(c, ControlNames.Of(c)))];
+
+    [ObservableProperty]
+    public partial NamedChoice<SecurityControl>? ExemptionControl { get; set; }
+
+    public IReadOnlyList<NamedChoice<int>> ExemptionDurations { get; } =
+    [
+        new(30, "30 minutes"), new(60, "1 hour"), new(120, "2 hours"), new(240, "4 hours"), new(480, "8 hours"), new(1440, "1 day"), new(10080, "1 week"),
+    ];
+
+    [ObservableProperty]
+    public partial NamedChoice<int>? ExemptionDuration { get; set; }
+
+    [ObservableProperty]
+    public partial string ExemptionReason { get; set; } = string.Empty;
 
     public bool HasDetail => Detail is not null;
 
@@ -112,6 +146,8 @@ public sealed partial class ComputersViewModel(ShellViewModel shell, bool canWri
         PolicyChoices.Add(new PolicyChoice(null, "Default policy (default)"));
         StaffChoices.Add(new StaffChoice(new StaffSummary(Guid.NewGuid(), "EMP001", "Sample", null, AccountStatuses.Active, DateTimeOffset.UtcNow, null, false), true));
         InstalledSoftware.Add(new InstalledSoftwareResponse(detail.Summary.Id, detail.Summary.Hostname, "Free Game", "2.0", "Games Ltd", "User", false, DateTimeOffset.UtcNow));
+        Exemptions.Add(new ExemptionResponse(Guid.NewGuid(), detail.Summary.Id, nameof(SecurityControl.RemovableStorage), "Copy scanner files",
+            DateTimeOffset.UtcNow, DateTimeOffset.UtcNow.AddHours(2), DateTimeOffset.UtcNow, "Owner", true, null));
         Installations.Add(new DeploymentResponse(Guid.NewGuid(), Guid.NewGuid(), "Contoso Viewer", "viewer.msi", detail.Summary.Id, detail.Summary.Hostname, null, "Queued", 0, null, null, DateTimeOffset.UtcNow, null));
     }
 
@@ -228,6 +264,37 @@ public sealed partial class ComputersViewModel(ShellViewModel shell, bool canWri
         }
     });
 
+    [RelayCommand]
+    private Task CreateExemptionAsync() => RunAsync(async () =>
+    {
+        if (Selected is not { } computer || ExemptionControl is not { } control || ExemptionDuration is not { } duration)
+        {
+            ErrorMessage = "Choose what to allow and for how long.";
+            return;
+        }
+
+        if (!shell.Ui.Confirm("Temporary exception", $"Allow '{control.Label}' on {computer.Hostname} for {duration.Label}? The protection switches back on automatically afterwards."))
+        {
+            return;
+        }
+
+        var created = await shell.Api.CreateExemptionAsync(computer.Id, new CreateExemptionRequest(control.Value.ToString(), ExemptionReason.Trim(), duration.Value));
+        ExemptionReason = string.Empty;
+        InfoMessage = $"'{control.Label}' is allowed on {computer.Hostname} until {created.ExpiresAtUtc.ToLocalTime():HH:mm, dd MMM}. The computer applies this at its next check-in.";
+        await LoadDetailAsync(computer.Id);
+    });
+
+    [RelayCommand]
+    private Task EndExemptionAsync() => RunAsync(async () =>
+    {
+        if (Selected is { } computer && SelectedExemption is { IsActive: true } exemption)
+        {
+            await shell.Api.EndExemptionAsync(computer.Id, exemption.Id);
+            InfoMessage = "Exception ended. The protection switches back on at the computer's next check-in.";
+            await LoadDetailAsync(computer.Id);
+        }
+    });
+
     private async Task FetchAsync()
     {
         var status = StatusFilter switch
@@ -259,6 +326,7 @@ public sealed partial class ComputersViewModel(ShellViewModel shell, bool canWri
         var staff = await shell.Api.ListStaffAsync(1, 200, null, null);
         var software = await shell.Api.ListInstalledSoftwareAsync(id, null);
         var installations = await shell.Api.ListDeploymentsAsync(1, 20, id, null);
+        var exemptions = await shell.Api.ListExemptionsAsync(id);
         if (Selected?.Id != id)
         {
             return; // Selection changed while loading.
@@ -275,6 +343,12 @@ public sealed partial class ComputersViewModel(ShellViewModel shell, bool canWri
         foreach (var d in installations.Items)
         {
             Installations.Add(d);
+        }
+
+        Exemptions.Clear();
+        foreach (var x in exemptions)
+        {
+            Exemptions.Add(x);
         }
 
         RecentEvents.Clear();
