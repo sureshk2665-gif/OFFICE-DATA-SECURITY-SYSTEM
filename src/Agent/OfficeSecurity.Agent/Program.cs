@@ -41,9 +41,19 @@ static void RunAgent(string[] args)
     builder.Services.AddSingleton(new AgentConfigStore(paths));
     builder.Services.AddSingleton<IDeviceKeyStore, CngDeviceKeyStore>();
     builder.Services.AddSingleton<IInventoryCollector, WindowsInventoryCollector>();
-    builder.Services.AddSingleton<EnforcementCoordinator>();
-    // Enforcers (IEnforcer) are registered here as they are implemented in Phase 5.
     builder.Services.AddSingleton(sp => new PendingEventStore(paths, sp.GetRequiredService<TimeProvider>()));
+
+    // Security controls (Phase 5). Each one reports "Enforced" only after reading the Windows setting back.
+    builder.Services.AddSingleton<IEnforcementEvents>(sp => new QueuedEnforcementEvents(sp.GetRequiredService<PendingEventStore>()));
+    builder.Services.AddSingleton(new RegistryPolicyEngine(new WindowsPolicyRegistry(), new FileManagedSettingsStore(paths.DataDirectory)));
+    builder.Services.AddSingleton<IEnforcer, RemovableStorageEnforcer>();
+    builder.Services.AddSingleton<IEnforcer, MobileDeviceTransferEnforcer>();
+    builder.Services.AddSingleton<IEnforcer, SoftwareInstallationEnforcer>();
+    builder.Services.AddSingleton<IEnforcer, BrowserEnforcer>();
+    builder.Services.AddSingleton<IEnforcer>(sp => new FirewallEnforcer(new WindowsFirewall(),
+        new FileManagedSettingsStore(paths.DataDirectory, FileManagedSettingsStore.FirewallFile), sp.GetRequiredService<IEnforcementEvents>(), sp.GetRequiredService<TimeProvider>()));
+    builder.Services.AddSingleton<IEnforcer>(sp => new ServiceProtectionEnforcer(sp.GetRequiredService<IEnforcementEvents>(), sp.GetRequiredService<TimeProvider>()));
+    builder.Services.AddSingleton<EnforcementCoordinator>();
     builder.Services.AddSingleton(new PolicyCache(paths));
     builder.Services.AddSingleton(new AgentRuntimeOptions
     {

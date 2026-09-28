@@ -77,6 +77,15 @@ internal static class ComputerEndpoints
         write.MapPut(ApiRoutes.Computers + "/{id:guid}/staff", async (Guid id, AssignStaffRequest request, ComputerAdministration computers, HttpContext http, CancellationToken ct) =>
             (await computers.AssignStaffAsync(id, request, http.ToRequestContext(), ct)).ToHttp());
 
+        read.MapGet(ApiRoutes.Computers + "/{id:guid}/exemptions", async (Guid id, ExemptionService exemptions, CancellationToken ct) =>
+            (await exemptions.ListAsync(id, ct)).ToHttp());
+
+        write.MapPost(ApiRoutes.Computers + "/{id:guid}/exemptions", async (Guid id, CreateExemptionRequest request, ExemptionService exemptions, HttpContext http, CancellationToken ct) =>
+            (await exemptions.CreateAsync(id, request, http.ToRequestContext(), ct)).ToHttp());
+
+        write.MapDelete(ApiRoutes.Computers + "/{id:guid}/exemptions/{exemptionId:guid}", async (Guid id, Guid exemptionId, ExemptionService exemptions, HttpContext http, CancellationToken ct) =>
+            (await exemptions.RevokeAsync(id, exemptionId, http.ToRequestContext(), ct)).ToHttpNoContent());
+
         write.MapPost(ApiRoutes.Policies, async (SavePolicyRequest request, PolicyService policies, HttpContext http, CancellationToken ct) =>
             (await policies.CreateAsync(request, http.ToRequestContext(), ct)).ToHttp());
 

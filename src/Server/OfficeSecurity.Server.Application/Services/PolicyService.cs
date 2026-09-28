@@ -11,7 +11,7 @@ namespace OfficeSecurity.Server.Application.Services;
 /// Security policy definitions and the effective, signed policy of each computer. A computer uses its
 /// assigned policy, or the default policy when none is assigned.
 /// </summary>
-public sealed class PolicyService(IServerDbContext db, AuditLog audit, IPolicySigningService signer, TimeProvider clock)
+public sealed class PolicyService(IServerDbContext db, AuditLog audit, IPolicySigningService signer, ExemptionService exemptions, TimeProvider clock)
 {
     public const int MaxNameLength = 100;
     public const int MaxDescriptionLength = 500;
@@ -144,7 +144,8 @@ public sealed class PolicyService(IServerDbContext db, AuditLog audit, IPolicySi
     {
         ArgumentNullException.ThrowIfNull(computer);
         var settings = await GetEffectiveSettingsAsync(computer, cancellationToken).ConfigureAwait(false);
-        return signer.Sign(settings.ToDocument(computer.Id, computer.PolicyVersion, clock.GetUtcNow()));
+        var active = await exemptions.ForPolicyAsync(computer.Id, cancellationToken).ConfigureAwait(false);
+        return signer.Sign(settings.ToDocument(computer.Id, computer.PolicyVersion, clock.GetUtcNow(), active));
     }
 
     public async Task<PolicySettings> GetEffectiveSettingsAsync(Computer computer, CancellationToken cancellationToken = default)

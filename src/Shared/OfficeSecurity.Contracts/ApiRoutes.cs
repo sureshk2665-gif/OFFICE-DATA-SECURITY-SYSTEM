@@ -50,6 +50,8 @@ public static class ApiRoutes
     public const string SoftwareInventory = Prefix + "/software/inventory";
     public const string SoftwareInventoryComputers = SoftwareInventory + "/computers";
 
+    public static string ComputerExemptions(Guid id) => $"{Computers}/{id}/exemptions";
+    public static string ComputerExemptionById(Guid id, Guid exemptionId) => $"{Computers}/{id}/exemptions/{exemptionId}";
     public static string AgentJobStart(Guid id) => $"{AgentJobs}/{id}/start";
     public static string AgentJobPackage(Guid id) => $"{AgentJobs}/{id}/package";
     public static string AgentJobResult(Guid id) => $"{AgentJobs}/{id}/result";

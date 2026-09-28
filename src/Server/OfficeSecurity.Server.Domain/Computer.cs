@@ -152,3 +152,30 @@ public sealed class StaffComputerAssignment
 
     public Guid AssignedByAdminId { get; set; }
 }
+
+/// <summary>
+/// A time-limited exception for one security control on one computer (e.g. "allow USB drives on PC-07 for
+/// two hours"). Included in the computer's signed policy; the agent lifts the control only while it is active.
+/// </summary>
+public sealed class ControlExemption
+{
+    public Guid Id { get; set; }
+
+    public Guid ComputerId { get; set; }
+
+    public required string Control { get; set; }
+
+    public required string Reason { get; set; }
+
+    public DateTimeOffset StartsAtUtc { get; set; }
+
+    public DateTimeOffset ExpiresAtUtc { get; set; }
+
+    public DateTimeOffset CreatedAtUtc { get; set; }
+
+    public Guid CreatedByAdminId { get; set; }
+
+    public DateTimeOffset? RevokedAtUtc { get; set; }
+
+    public Guid? RevokedByAdminId { get; set; }
+}

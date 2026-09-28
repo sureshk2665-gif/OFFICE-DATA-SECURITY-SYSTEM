@@ -37,5 +37,7 @@ public interface IServerDbContext
 
     DbSet<DeploymentJob> DeploymentJobs { get; }
 
+    DbSet<ControlExemption> Exemptions { get; }
+
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

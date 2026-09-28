@@ -38,6 +38,8 @@ public sealed class ServerDbContext(DbContextOptions<ServerDbContext> options) :
 
     public DbSet<DeploymentJob> DeploymentJobs => Set<DeploymentJob>();
 
+    public DbSet<ControlExemption> Exemptions => Set<ControlExemption>();
+
     protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
     {
         ArgumentNullException.ThrowIfNull(configurationBuilder);
@@ -246,6 +248,16 @@ public sealed class ServerDbContext(DbContextOptions<ServerDbContext> options) :
             e.HasIndex(j => new { j.ComputerId, j.Status });
             e.HasOne<SoftwarePackage>().WithMany().HasForeignKey(j => j.PackageId).OnDelete(DeleteBehavior.Restrict);
             e.HasOne<Computer>().WithMany().HasForeignKey(j => j.ComputerId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<ControlExemption>(e =>
+        {
+            e.ToTable("control_exemptions");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Control).HasMaxLength(64);
+            e.Property(x => x.Reason).HasMaxLength(500);
+            e.HasIndex(x => new { x.ComputerId, x.ExpiresAtUtc });
+            e.HasOne<Computer>().WithMany().HasForeignKey(x => x.ComputerId).OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<StaffComputerAssignment>(e =>

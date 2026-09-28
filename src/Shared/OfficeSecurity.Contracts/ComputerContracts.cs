@@ -54,3 +54,35 @@ public sealed record SecurityEventResponse(
     DateTimeOffset OccurredAtUtc,
     DateTimeOffset ReceivedAtUtc,
     string? Details);
+
+/// <summary>A temporary exception to one security control on one computer.</summary>
+public sealed record ExemptionResponse(
+    Guid Id,
+    Guid ComputerId,
+    string Control,
+    string Reason,
+    DateTimeOffset StartsAtUtc,
+    DateTimeOffset ExpiresAtUtc,
+    DateTimeOffset CreatedAtUtc,
+    string? CreatedBy,
+    bool IsActive,
+    DateTimeOffset? RevokedAtUtc);
+
+/// <summary>Starts now and lasts <paramref name="DurationMinutes"/> (5 minutes to 30 days).</summary>
+public sealed record CreateExemptionRequest(string Control, string Reason, int DurationMinutes);
+
+public static class Exemptions
+{
+    public const int MinMinutes = 5;
+    public const int MaxMinutes = 30 * 24 * 60;
+
+    /// <summary>Controls that can be lifted temporarily for one computer.</summary>
+    public static readonly IReadOnlyList<SecurityControl> AllowedControls =
+    [
+        SecurityControl.RemovableStorage,
+        SecurityControl.MobileDeviceTransfer,
+        SecurityControl.SoftwareInstallation,
+        SecurityControl.NetworkRestrictions,
+        SecurityControl.BrowserRestrictions,
+    ];
+}

@@ -29,6 +29,9 @@ public enum ControlState
 
     /// <summary>The control has not been implemented in this version of the agent.</summary>
     NotImplemented = 7,
+
+    /// <summary>An administrator lifted the control on this computer for a limited time.</summary>
+    TemporarilyAllowed = 8,
 }
 
 /// <summary>Status of one control, as reported by the agent in each heartbeat.</summary>

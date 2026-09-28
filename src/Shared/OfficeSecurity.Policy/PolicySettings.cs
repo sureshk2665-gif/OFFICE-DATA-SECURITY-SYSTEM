@@ -12,6 +12,8 @@ public sealed record PolicySettings
 
     public ApplicationControlSettings ApplicationControl { get; init; } = new();
 
+    public SoftwareInstallationSettings SoftwareInstallation { get; init; } = new();
+
     public NetworkSettings Network { get; init; } = new();
 
     public BrowserSettings Browser { get; init; } = new();
@@ -28,6 +30,7 @@ public sealed record PolicySettings
         RemovableStorage = RemovableStorage,
         Bluetooth = Bluetooth,
         ApplicationControl = ApplicationControl,
+        SoftwareInstallation = SoftwareInstallation,
         Network = Network,
         Browser = Browser,
         FileProtection = FileProtection,

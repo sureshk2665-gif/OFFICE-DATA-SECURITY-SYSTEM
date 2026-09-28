@@ -7,6 +7,8 @@ public static class PolicyDocumentValidator
 {
     public const int MinHeartbeatSeconds = 15;
     public const int MaxHeartbeatSeconds = 3600;
+    public const int MaxListEntries = 1000;
+    public const int MaxUrlLength = 2048;
 
     public static IReadOnlyList<string> Validate(SecurityPolicyDocument document)
     {
@@ -58,6 +60,11 @@ public static class PolicyDocumentValidator
             }
         }
 
+        CheckList(errors, "Blocked website", document.Browser.BlockedUrls, MaxUrlLength);
+        CheckList(errors, "Allowed website", document.Browser.AllowedUrls, MaxUrlLength);
+        CheckList(errors, "Wi-Fi network", document.Network.AllowedWifiNetworks, 32);
+        CheckList(errors, "Blocked program", document.Network.BlockedApplicationPaths, 260);
+
         foreach (var exception in document.Exceptions)
         {
             if (exception.ExpiresAtUtc <= exception.StartsAtUtc)
@@ -80,6 +87,22 @@ public static class PolicyDocumentValidator
         if (errors.Count > 0)
         {
             throw new ArgumentException("Invalid policy: " + string.Join("; ", errors), nameof(document));
+        }
+    }
+
+    private static void CheckList(List<string> errors, string what, IReadOnlyList<string> values, int maxLength)
+    {
+        if (values.Count > MaxListEntries)
+        {
+            errors.Add(string.Create(CultureInfo.InvariantCulture, $"At most {MaxListEntries} entries are allowed for {what.ToLowerInvariant()}s."));
+        }
+
+        foreach (var value in values)
+        {
+            if (string.IsNullOrWhiteSpace(value) || value.Length > maxLength || value.Any(char.IsControl) || value != value.Trim())
+            {
+                errors.Add(string.Create(CultureInfo.InvariantCulture, $"{what} '{value}' is not valid (1–{maxLength} characters, no line breaks)."));
+            }
         }
     }
 

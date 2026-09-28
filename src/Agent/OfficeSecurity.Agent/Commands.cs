@@ -1,6 +1,7 @@
 using System.Security.Principal;
 using System.Text.Json;
 using OfficeSecurity.Agent.Core;
+using OfficeSecurity.Agent.Enforcement;
 using OfficeSecurity.Client.Core;
 
 namespace OfficeSecurity.Agent;
@@ -132,6 +133,11 @@ internal static class Commands
         ServiceInstaller.Delete();
 
         var paths = new AgentPaths(AgentPaths.DefaultDataDirectory());
+
+        // Give the computer back its normal Windows behaviour: remove exactly the settings the agent made.
+        var settings = new RegistryPolicyEngine(new WindowsPolicyRegistry(), new FileManagedSettingsStore(paths.DataDirectory)).RemoveAll();
+        var rules = FirewallEnforcer.RemoveAll(new WindowsFirewall(), new FileManagedSettingsStore(paths.DataDirectory, FileManagedSettingsStore.FirewallFile));
+        Console.WriteLine($"Removed the protections set by the agent ({settings} Windows setting(s), {rules} firewall rule(s)).");
         var config = new AgentConfigStore(paths).Load();
         if (config.KeyName is not null)
         {

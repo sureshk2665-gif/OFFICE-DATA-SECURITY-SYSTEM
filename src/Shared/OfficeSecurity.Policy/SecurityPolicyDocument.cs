@@ -23,6 +23,8 @@ public sealed record SecurityPolicyDocument
 
     public ApplicationControlSettings ApplicationControl { get; init; } = new();
 
+    public SoftwareInstallationSettings SoftwareInstallation { get; init; } = new();
+
     public NetworkSettings Network { get; init; } = new();
 
     public BrowserSettings Browser { get; init; } = new();
@@ -92,15 +94,29 @@ public sealed record ApplicationControlSettings
     public IReadOnlyList<string> AllowedFileHashes { get; init; } = [];
 }
 
+public sealed record SoftwareInstallationSettings
+{
+    /// <summary>
+    /// Stop standard users installing Windows Installer (MSI) programs for themselves and installing packaged
+    /// (Store/AppX) apps. Installations by administrators and by this system are not affected.
+    /// </summary>
+    public bool BlockStaffInstalls { get; init; }
+}
+
 public sealed record NetworkSettings
 {
     /// <summary>Full paths of programs denied outbound network access by Windows Firewall.</summary>
     public IReadOnlyList<string> BlockedApplicationPaths { get; init; } = [];
 
-    /// <summary>When non-empty, only these Wi-Fi network names may be used (blocks phone hotspots).</summary>
+    /// <summary>When non-empty, only these Wi-Fi network names may be used (blocks phone hotspots). Not enforced yet.</summary>
     public IReadOnlyList<string> AllowedWifiNetworks { get; init; } = [];
 }
 
+/// <summary>
+/// Applied to Microsoft Edge, Google Chrome and Mozilla Firefox through their documented policies. URL patterns
+/// use the Chromium URL filter format ("example.com", "*.example.com" is not needed: "example.com" covers
+/// subdomains; "*" means every site).
+/// </summary>
 public sealed record BrowserSettings
 {
     public IReadOnlyList<string> BlockedUrls { get; init; } = [];

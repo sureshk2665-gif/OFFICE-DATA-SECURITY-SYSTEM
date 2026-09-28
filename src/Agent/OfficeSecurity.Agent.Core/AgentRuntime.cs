@@ -27,6 +27,9 @@ public sealed class AgentRuntimeOptions
 
     public int EventUploadBatchSize { get; init; } = 200;
 
+    /// <summary>How often every protection is checked and, if someone changed it, restored.</summary>
+    public TimeSpan EnforcementInterval { get; init; } = TimeSpan.FromSeconds(60);
+
     /// <summary>Tests run installations inside <see cref="AgentRuntime.RunOnceAsync"/>; the service runs them in the background.</summary>
     public bool RunInstallationsInline { get; init; }
 }
@@ -56,6 +59,7 @@ public sealed partial class AgentRuntime : IDisposable
     private bool _started;
     private Dictionary<string, ConnectedDevice>? _lastDevices;
     private DateTimeOffset _nextHeartbeat;
+    private DateTimeOffset _nextEnforcement;
     private DateTimeOffset _nextInventory;
     private DateTimeOffset _pendingSince;
     private long _rejectedPolicyVersion;
@@ -190,7 +194,7 @@ public sealed partial class AgentRuntime : IDisposable
             }
         }
 
-        Controls = await _enforcement.ApplyAsync(CurrentPolicy, cancellationToken).ConfigureAwait(false);
+        await EnforceAsync(cancellationToken).ConfigureAwait(false);
         _events.Enqueue(SecurityEventType.AgentStarted, EventSeverities.Information,
             string.Create(CultureInfo.InvariantCulture, $"Agent {_options.AgentVersion} started; enforcing policy version {CurrentPolicy.Version}."));
         _nextHeartbeat = _nextInventory = _clock.GetUtcNow();
@@ -288,6 +292,11 @@ public sealed partial class AgentRuntime : IDisposable
         var client = GetClient(config);
         var now = _clock.GetUtcNow();
 
+        if (now >= _nextEnforcement)
+        {
+            await EnforceAsync(cancellationToken).ConfigureAwait(false);
+        }
+
         var devices = PollDevices();
 
         if (now >= _nextHeartbeat)
@@ -370,10 +379,70 @@ public sealed partial class AgentRuntime : IDisposable
 
         _policyCache.Save(envelope);
         CurrentPolicy = result.Document!;
-        Controls = await _enforcement.ApplyAsync(CurrentPolicy, cancellationToken).ConfigureAwait(false);
+        await EnforceAsync(cancellationToken).ConfigureAwait(false);
         _events.Enqueue(SecurityEventType.PolicyApplied, EventSeverities.Information,
             string.Create(CultureInfo.InvariantCulture, $"Policy version {CurrentPolicy.Version} applied."));
         LogPolicyApplied(_logger, CurrentPolicy.Version);
+    }
+
+    /// <summary>
+    /// Applies (and so verifies and, if needed, restores) every control of the current policy. Also records when a
+    /// temporary exception starts or ends.
+    /// </summary>
+    private async Task EnforceAsync(CancellationToken cancellationToken)
+    {
+        var previous = Controls.ToDictionary(c => c.Control, c => c.State);
+        Controls = await _enforcement.ApplyAsync(CurrentPolicy, cancellationToken).ConfigureAwait(false);
+        _nextEnforcement = _clock.GetUtcNow() + _options.EnforcementInterval;
+
+        foreach (var status in Controls)
+        {
+            var before = previous.GetValueOrDefault(status.Control, ControlState.Unknown);
+            if (status.State == ControlState.TemporarilyAllowed && before != ControlState.TemporarilyAllowed)
+            {
+                _events.Enqueue(SecurityEventType.PolicyApplied, EventSeverities.Warning, $"{status.Control} lifted on this computer. {status.Details}");
+            }
+            else if (before == ControlState.TemporarilyAllowed && status.State != ControlState.TemporarilyAllowed)
+            {
+                _events.Enqueue(SecurityEventType.PolicyApplied, EventSeverities.Information, $"Temporary exception for {status.Control} ended; the protection is back on ({status.State}).");
+            }
+            else if (status.State == ControlState.Failed && before != ControlState.Failed)
+            {
+                _events.Enqueue(SecurityEventType.PolicyViolation, EventSeverities.Warning, $"{status.Control} could not be enforced: {status.Details}");
+            }
+        }
+    }
+
+    private ControlState StateOf(SecurityControl control) =>
+        Controls.FirstOrDefault(c => c.Control == control)?.State ?? ControlState.Unknown;
+
+    /// <summary>The control that governs a newly connected device, if any.</summary>
+    private SecurityControl? GoverningControl(ConnectedDevice device) => device.DeviceClass switch
+    {
+        "DiskDrive" => SecurityControl.RemovableStorage,
+        "CDROM" when CurrentPolicy.RemovableStorage.BlockOpticalDrives => SecurityControl.RemovableStorage,
+        "WPD" when CurrentPolicy.RemovableStorage.BlockPortableDevices => SecurityControl.MobileDeviceTransfer,
+        _ => null,
+    };
+
+    private void RecordConnection(string id, ConnectedDevice device)
+    {
+        var control = GoverningControl(device);
+        var state = control is { } c ? StateOf(c) : ControlState.Unknown;
+        switch (state)
+        {
+            case ControlState.Enforced:
+                _events.Enqueue(SecurityEventType.RemovableStorageBlocked, EventSeverities.Warning,
+                    $"{device.DeviceClass} connected and blocked by policy (no file access): {device.Name} [{id}]");
+                break;
+            case ControlState.AuditOnly:
+                _events.Enqueue(SecurityEventType.UnauthorizedUsbConnection, EventSeverities.Warning,
+                    $"{device.DeviceClass} connected (audit mode: it would be blocked when the policy is enforced): {device.Name} [{id}]");
+                break;
+            default:
+                _events.Enqueue(SecurityEventType.DeviceConnected, EventSeverities.Information, $"{device.DeviceClass} connected: {device.Name} [{id}]");
+                break;
+        }
     }
 
     private List<ConnectedDevice> PollDevices()
@@ -386,7 +455,7 @@ public sealed partial class AgentRuntime : IDisposable
         {
             foreach (var (id, device) in current.Where(c => !_lastDevices.ContainsKey(c.Key)))
             {
-                _events.Enqueue(SecurityEventType.DeviceConnected, EventSeverities.Information, $"{device.DeviceClass} connected: {device.Name} [{id}]");
+                RecordConnection(id, device);
             }
 
             foreach (var (id, device) in _lastDevices.Where(l => !current.ContainsKey(l.Key)))
