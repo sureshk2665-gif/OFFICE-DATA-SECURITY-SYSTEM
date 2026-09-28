@@ -227,7 +227,9 @@ public sealed partial class WindowsAgentServiceTests(ITestOutputHelper output)
         await WaitForAsync(() => Task.FromResult(HklmValue(UsbKey, "Deny_Read") is 1 ? (bool?)true : null), TimeSpan.FromSeconds(120), "deleted USB setting restored by the agent");
 
         // Tampering 2: someone lets every signed-in user stop the service -> restored and reported.
-        var weak = (await ScAsync("sdshow", "OfficeSecurityAgent")).Trim().Split('\n').Last(l => l.StartsWith("D:", StringComparison.Ordinal)).Trim() + "(A;;RPWP;;;IU)";
+        // Insert an extra "allow start/stop" entry for interactive users at the start of the permission list (D:).
+        var sddl = (await ScAsync("sdshow", "OfficeSecurityAgent")).Split('\n').Select(l => l.Trim()).Last(l => l.Contains("D:", StringComparison.Ordinal));
+        var weak = sddl.Replace("D:", "D:(A;;RPWP;;;IU)", StringComparison.Ordinal);
         await RunAsync(Path.Combine(Environment.SystemDirectory, "sc.exe"), "sdset", "OfficeSecurityAgent", weak);
         Assert.Contains("(A;;RPWP;;;IU)", await ScAsync("sdshow", "OfficeSecurityAgent"), StringComparison.Ordinal);
         await WaitForAsync(async () => (await ScAsync("sdshow", "OfficeSecurityAgent")).Contains("(A;;RPWP;;;IU)", StringComparison.Ordinal) ? null : (bool?)true,
