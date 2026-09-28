@@ -13,9 +13,32 @@ public sealed class ComputerAdministration(
     IServerDbContext db,
     AuditLog audit,
     IDeviceCertificateAuthority certificateAuthority,
+    IPolicySigningService policySigner,
     TimeProvider clock)
 {
     public static readonly TimeSpan EnrollmentCodeLifetime = TimeSpan.FromHours(24);
+
+    /// <summary>
+    /// A code that lets someone remove the agent from this one computer during the next 24 hours (the agent
+    /// refuses to uninstall without it while the computer is managed). Recorded in the audit log.
+    /// </summary>
+    public async Task<Result<UninstallCodeResponse>> CreateUninstallCodeAsync(Guid id, RequestContext context, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        var computer = await db.Computers.AsNoTracking().FirstOrDefaultAsync(c => c.Id == id, cancellationToken).ConfigureAwait(false);
+        if (computer is null)
+        {
+            return ServiceError.NotFound("Computer not found.");
+        }
+
+        var expires = clock.GetUtcNow() + OfficeSecurity.Policy.UninstallAuthorization.Lifetime;
+        var code = OfficeSecurity.Policy.UninstallAuthorization.Encode(expires,
+            policySigner.SignData(OfficeSecurity.Policy.UninstallAuthorization.Payload(id, expires)));
+        await audit.RecordAndSaveAsync(context, new AuditRecord("computer.uninstall-code", TargetType: "Computer", TargetId: id.ToString(),
+            Details: $"Uninstall code for {computer.Hostname}, valid until {expires:u}"), cancellationToken).ConfigureAwait(false);
+        return new UninstallCodeResponse(code, expires,
+            $"\"C:\\Program Files\\OfficeSecurity\\Agent\\OfficeSecurity.Agent.exe\" uninstall --code {code}");
+    }
 
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 

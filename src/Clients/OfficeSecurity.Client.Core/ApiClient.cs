@@ -285,6 +285,9 @@ public sealed class ApiClient : IDisposable
     public Task EndExemptionAsync(Guid computerId, Guid exemptionId, CancellationToken ct = default) =>
         SendAsync<object>(HttpMethod.Delete, ApiRoutes.ComputerExemptionById(computerId, exemptionId), null, ct);
 
+    public Task<UninstallCodeResponse> CreateUninstallCodeAsync(Guid computerId, CancellationToken ct = default) =>
+        SendAsync<UninstallCodeResponse>(HttpMethod.Post, ApiRoutes.ComputerUninstallCode(computerId), null, ct);
+
     public Task<List<RecoveryKeyResponse>> ListRecoveryKeysAsync(Guid computerId, CancellationToken ct = default) =>
         SendAsync<List<RecoveryKeyResponse>>(HttpMethod.Get, ApiRoutes.ComputerRecoveryKeys(computerId), null, ct);
 

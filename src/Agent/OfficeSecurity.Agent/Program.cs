@@ -16,7 +16,7 @@ if (command is "service" or "run" || (command is null && WindowsServiceHelpers.I
 return command switch
 {
     "install" => await Commands.InstallAsync(args[1..]),
-    "uninstall" => Commands.Uninstall(),
+    "uninstall" => Commands.Uninstall(args),
     "status" => await Commands.StatusAsync(),
     "inventory" => Commands.Inventory(),
     "check" => Commands.Check(),

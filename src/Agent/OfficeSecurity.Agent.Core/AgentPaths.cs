@@ -13,6 +13,9 @@ public sealed class AgentPaths(string dataDirectory)
 
     public string EventQueueFile => Path.Combine(DataDirectory, "events.db");
 
+    /// <summary>Written by an authorised uninstall just before it stops the service (see AgentRuntime.NotifyStoppingAsync).</summary>
+    public string UninstallMarkerFile => Path.Combine(DataDirectory, "uninstalling");
+
     public string FileKeyDirectory => Path.Combine(DataDirectory, "keys");
 
     public static string DefaultDataDirectory() =>

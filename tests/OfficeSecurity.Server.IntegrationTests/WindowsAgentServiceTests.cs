@@ -57,6 +57,7 @@ public sealed partial class WindowsAgentServiceTests(ITestOutputHelper output)
         var install = await RunAsync(exe, "install", "--server", $"https://localhost:{server.HttpsPort}",
             "--pairing-code", server.PairingCodeFromConnectionInfo(), "--enrollment-code", await server.CreateEnrollmentCodeAsync(owner));
         Assert.True(install == 0, "install failed");
+        Guid? computerId = null;
 
         try
         {
@@ -65,9 +66,11 @@ public sealed partial class WindowsAgentServiceTests(ITestOutputHelper output)
                 (await admin.GetFromJsonAsync<PagedResult<ComputerSummary>>(ApiRoutes.Computers))!.Items.FirstOrDefault(c => c.Status == ComputerStatuses.PendingApproval),
                 TimeSpan.FromSeconds(90), "computer registered");
             Assert.Equal(Environment.MachineName, pending.Hostname, ignoreCase: true);
+            computerId = pending.Id;
 
             // 2. After approval it comes online, reports Windows inventory and applies policy version 1.
             (await admin.PostAsync(new Uri(ApiRoutes.ComputerApprove(pending.Id), UriKind.Relative), null)).EnsureSuccessStatusCode();
+            _approved = true;
             var online = await WaitForAsync(async () =>
             {
                 var d = await admin.GetFromJsonAsync<ComputerDetail>(ApiRoutes.ComputerById(pending.Id));
@@ -139,8 +142,29 @@ public sealed partial class WindowsAgentServiceTests(ITestOutputHelper output)
         finally
         {
             await RunAsync("net.exe", "user", TestUser, "/delete");
-            var uninstall = await RunAsync(exe, "uninstall");
-            Assert.Equal(0, uninstall);
+            if (computerId is { } id && _approved)
+            {
+                // While managed, uninstall is refused without a code from the dashboard ...
+                Assert.Equal(7, await RunAsync(exe, "uninstall"));
+                Assert.Equal(7, await RunAsync(exe, "uninstall", "--code", "U1-not-a-real-code"));
+                Assert.Contains("RUNNING", await ScAsync("query", "OfficeSecurityAgent"), StringComparison.Ordinal);
+                output.WriteLine("Uninstall without a valid code: refused; the agent keeps running.");
+
+                // ... and works with one.
+                var code = await (await admin.PostAsync(new Uri(ApiRoutes.ComputerUninstallCode(id), UriKind.Relative), null))
+                    .EnsureSuccessStatusCode().Content.ReadFromJsonAsync<UninstallCodeResponse>();
+                Assert.Equal(0, await RunAsync(exe, "uninstall", "--code", code!.Code));
+                await server.RunAlertEngineAsync();
+                var alerts = (await admin.GetFromJsonAsync<PagedResult<AlertResponse>>($"{ApiRoutes.Alerts}?status=All&pageSize=200"))!.Items;
+                Assert.Single(alerts, a => a.RuleCode == "agent-stopped"); // still only the one from "sc stop" earlier
+                var notice = (await admin.GetFromJsonAsync<PagedResult<SecurityEventResponse>>($"{ApiRoutes.Events}?computerId={id}&type=AgentStoppedOrUnavailable"))!.Items;
+                Assert.Contains(notice, e => e.Details!.Contains("uninstall code", StringComparison.Ordinal));
+                output.WriteLine("Uninstall with the code from the dashboard: done; reported as an authorised removal (no alert).");
+            }
+            else
+            {
+                Assert.Equal(0, await RunAsync(exe, "uninstall"));
+            }
             RestoreFirewall();
             if (Environment.GetEnvironmentVariable(WindowsServiceFactAttribute.TestMsiVariable) is { Length: > 0 } msi && File.Exists(msi))
             {
@@ -516,6 +540,7 @@ public sealed partial class WindowsAgentServiceTests(ITestOutputHelper output)
         return (process.ExitCode, await stdout + await stderr);
     }
 
+    private bool _approved;
     private bool _blockReported;
     private bool _lateBlockReported;
 

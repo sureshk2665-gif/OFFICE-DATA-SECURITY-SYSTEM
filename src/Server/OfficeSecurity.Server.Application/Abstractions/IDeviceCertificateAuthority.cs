@@ -21,4 +21,7 @@ public interface IPolicySigningService
     string PublicKeyBase64 { get; }
 
     OfficeSecurity.Policy.SignedPolicyEnvelope Sign(OfficeSecurity.Policy.SecurityPolicyDocument document);
+
+    /// <summary>ECDSA P-256 / SHA-256 signature (IEEE P1363) with the policy signing key, e.g. for uninstall codes.</summary>
+    byte[] SignData(byte[] data);
 }

@@ -156,11 +156,14 @@ public sealed partial class AgentRuntime : IDisposable
     /// <summary>Text of the notice sent when Windows shuts down; the server does not raise an alert for it.</summary>
     public const string ShutdownNotice = "Windows is shutting down or restarting; the agent stops until Windows starts again.";
 
+    /// <summary>Text of the notice sent when the agent is removed with a valid uninstall code (no alert either).</summary>
+    public const string UninstallNotice = "The agent is being removed from this computer with an uninstall code from the dashboard. Remove the computer from management when done.";
+
     /// <summary>
     /// Tells the server the agent is stopping, so a computer that is switched off is not mistaken for one whose
     /// agent was stopped. Best effort: waits at most a few seconds for the server.
     /// </summary>
-    public async Task NotifyStoppingAsync(bool windowsShuttingDown, TimeSpan timeout)
+    public async Task NotifyStoppingAsync(bool windowsShuttingDown, TimeSpan timeout, bool authorisedUninstall = false)
     {
         var config = _configStore.Load();
         if (config.State != AgentState.Enrolled)
@@ -168,7 +171,11 @@ public sealed partial class AgentRuntime : IDisposable
             return;
         }
 
-        if (windowsShuttingDown)
+        if (authorisedUninstall)
+        {
+            _events.Enqueue(SecurityEventType.AgentStoppedOrUnavailable, EventSeverities.Information, UninstallNotice);
+        }
+        else if (windowsShuttingDown)
         {
             _events.Enqueue(SecurityEventType.AgentStoppedOrUnavailable, EventSeverities.Information, ShutdownNotice);
         }

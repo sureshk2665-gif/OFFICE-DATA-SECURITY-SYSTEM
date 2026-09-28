@@ -39,5 +39,7 @@ public sealed class PolicySigningService : IPolicySigningService, IDisposable
 
     public SignedPolicyEnvelope Sign(SecurityPolicyDocument document) => _signer.Sign(document);
 
+    public byte[] SignData(byte[] data) => _key.SignData(data, HashAlgorithmName.SHA256, DSASignatureFormat.IeeeP1363FixedFieldConcatenation);
+
     public void Dispose() => _key.Dispose();
 }

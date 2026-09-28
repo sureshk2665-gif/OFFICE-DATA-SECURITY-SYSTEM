@@ -72,6 +72,9 @@ internal static class ComputerEndpoints
         write.MapPost(ApiRoutes.Computers + "/{id:guid}/retire", async (Guid id, ComputerAdministration computers, HttpContext http, CancellationToken ct) =>
             (await computers.RetireAsync(id, http.ToRequestContext(), ct)).ToHttp());
 
+        write.MapPost(ApiRoutes.Computers + "/{id:guid}/uninstall-code", async (Guid id, ComputerAdministration computers, HttpContext http, CancellationToken ct) =>
+            (await computers.CreateUninstallCodeAsync(id, http.ToRequestContext(), ct)).ToHttp());
+
         write.MapPut(ApiRoutes.Computers + "/{id:guid}/policy", async (Guid id, AssignPolicyRequest request, ComputerAdministration computers, HttpContext http, CancellationToken ct) =>
             (await computers.AssignPolicyAsync(id, request, http.ToRequestContext(), ct)).ToHttp());
 

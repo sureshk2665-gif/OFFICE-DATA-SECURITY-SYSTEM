@@ -74,7 +74,20 @@
             <Button Content="Approve" Command="{Binding ApproveCommand}" Style="{StaticResource Button.Primary}" IsEnabled="{Binding IsSelectedPending}" />
             <Button Content="Reject" Command="{Binding RejectCommand}" Style="{StaticResource Button.Secondary}" IsEnabled="{Binding IsSelectedPending}" Margin="8,0,0,0" />
             <Button Content="Remove from management" Command="{Binding RetireCommand}" Style="{StaticResource Button.Danger}" IsEnabled="{Binding IsSelectedTrusted}" Margin="8,0,0,0" />
+            <Button Content="Uninstall code..." Command="{Binding UninstallCodeCommand}" Style="{StaticResource Button.Secondary}" IsEnabled="{Binding IsSelectedTrusted}" Margin="8,0,0,0"
+                    ToolTip="A code that allows removing the agent from this computer during the next 24 hours" />
           </StackPanel>
+          <Border Visibility="{Binding HasUninstallCode, Converter={StaticResource BoolToVisibility}}" Background="#FFF7E6" Padding="12" Margin="0,12,0,0" CornerRadius="4">
+            <StackPanel>
+              <TextBlock Style="{StaticResource Text.Body}" TextWrapping="Wrap"
+                         Text="To remove the agent, run this in an administrator Command Prompt on that computer (valid 24 hours, for this computer only). With the installer, use: msiexec /x OfficeSecurity-StaffComputer.msi UNINSTALLCODE=&lt;code&gt;" />
+              <TextBox Text="{Binding UninstallCommand, Mode=OneWay}" IsReadOnly="True" FontFamily="Consolas" TextWrapping="Wrap" Margin="0,8,0,0" />
+              <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                <Button Content="Copy command" Command="{Binding CopyUninstallCommand}" Style="{StaticResource Button.Primary}" />
+                <Button Content="Copy code only" Command="{Binding CopyUninstallCodeCommand}" Style="{StaticResource Button.Secondary}" Margin="8,0,0,0" />
+              </StackPanel>
+            </StackPanel>
+          </Border>
         </StackPanel>
       </Border>
 

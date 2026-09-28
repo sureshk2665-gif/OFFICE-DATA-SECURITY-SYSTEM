@@ -3,7 +3,7 @@ using OfficeSecurity.Agent.Core;
 namespace OfficeSecurity.Agent;
 
 /// <summary>Runs the agent loop and the local status pipe for as long as the service runs.</summary>
-internal sealed partial class AgentWorker(AgentRuntime runtime, AgentLocalServer localServer, TimeProvider clock, ILogger<AgentWorker> logger) : BackgroundService
+internal sealed partial class AgentWorker(AgentRuntime runtime, AgentLocalServer localServer, AgentPaths paths, TimeProvider clock, ILogger<AgentWorker> logger) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -43,7 +43,10 @@ internal sealed partial class AgentWorker(AgentRuntime runtime, AgentLocalServer
     public override async Task StopAsync(CancellationToken cancellationToken)
     {
         await base.StopAsync(cancellationToken);
-        await runtime.NotifyStoppingAsync(AgentServiceLifetime.WindowsShuttingDown, TimeSpan.FromSeconds(5));
+        // Written by "uninstall" after it checked the uninstall code; only a fresh marker counts.
+        var marker = new FileInfo(paths.UninstallMarkerFile);
+        var authorisedUninstall = marker.Exists && clock.GetUtcNow() - marker.LastWriteTimeUtc < TimeSpan.FromMinutes(10);
+        await runtime.NotifyStoppingAsync(AgentServiceLifetime.WindowsShuttingDown, TimeSpan.FromSeconds(5), authorisedUninstall);
     }
 
     [LoggerMessage(Level = LogLevel.Error, Message = "Unexpected agent error; retrying in one minute.")]

@@ -33,7 +33,8 @@ internal static class Commands
               status      show whether this computer is registered and approved
               inventory   show the computer and device information the agent reports
               check       test the protections on this computer now (administrator; plug in a USB drive first)
-              uninstall   remove the agent from this computer (administrator)
+              uninstall   remove the agent from this computer (administrator; while the computer is managed:
+                          uninstall --code <code>, with the code from the dashboard: Computers → Uninstall code)
               run         run the agent in this window instead of as a service (troubleshooting, administrator)
             """);
         return unknown is null ? 0 : 2;
@@ -134,7 +135,7 @@ internal static class Commands
         return SelfCheck.Run();
     }
 
-    public static int Uninstall()
+    public static int Uninstall(string[] args)
     {
         if (!IsAdministrator())
         {
@@ -142,10 +143,28 @@ internal static class Commands
             return 5;
         }
 
+        var paths = new AgentPaths(AgentPaths.DefaultDataDirectory());
+
+        // While the computer is managed, removing the agent needs a code from the dashboard (valid 24 hours for
+        // this computer only). Computers that were never approved, or were removed from management, do not.
+        var managed = new AgentConfigStore(paths).Load();
+        if (managed is { State: AgentState.Enrolled, ComputerId: { } computerId, PolicySigningPublicKey: { } publicKey })
+        {
+            var problem = OfficeSecurity.Policy.UninstallAuthorization.Verify(Option(args, "--code"), computerId, Convert.FromBase64String(publicKey), DateTimeOffset.UtcNow);
+            if (problem is not null)
+            {
+                Console.Error.WriteLine("This computer is managed by the Office Security System, so removing the agent needs an uninstall code.");
+                Console.Error.WriteLine(problem);
+                Console.Error.WriteLine("Run: OfficeSecurity.Agent.exe uninstall --code <code>");
+                return 7;
+            }
+
+            // Tells the service to report this as an authorised removal, not as someone stopping the agent.
+            File.WriteAllText(paths.UninstallMarkerFile, DateTimeOffset.UtcNow.ToString("O", System.Globalization.CultureInfo.InvariantCulture));
+        }
+
         ServiceInstaller.Stop(TimeSpan.FromSeconds(30));
         ServiceInstaller.Delete();
-
-        var paths = new AgentPaths(AgentPaths.DefaultDataDirectory());
 
         // Give the computer back its normal Windows behaviour: remove exactly the settings the agent made.
         var settings = new RegistryPolicyEngine(new WindowsPolicyRegistry(), new FileManagedSettingsStore(paths.DataDirectory)).RemoveAll();

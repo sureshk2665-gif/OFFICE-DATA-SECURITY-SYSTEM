@@ -183,6 +183,7 @@ public sealed partial class ComputersViewModel(ShellViewModel shell, bool canWri
             DateTimeOffset.UtcNow, DateTimeOffset.UtcNow.AddHours(2), DateTimeOffset.UtcNow, "Owner", true, null));
         RecoveryKeys.Add(new RecoveryKeyResponse(1, "C:", "{00000000-0000-0000-0000-000000000000}", DateTimeOffset.UtcNow, DateTimeOffset.UtcNow));
         SelectedDevice = detail.Devices.FirstOrDefault(d => d.DeviceClass == "DiskDrive");
+        UninstallCode = new UninstallCodeResponse("U1-SAMPLE", DateTimeOffset.UtcNow.AddHours(24), "OfficeSecurity.Agent.exe uninstall --code U1-SAMPLE");
         Installations.Add(new DeploymentResponse(Guid.NewGuid(), Guid.NewGuid(), "Contoso Viewer", "viewer.msi", detail.Summary.Id, detail.Summary.Hostname, null, "Queued", 0, null, null, DateTimeOffset.UtcNow, null));
     }
 
@@ -223,6 +224,7 @@ public sealed partial class ComputersViewModel(ShellViewModel shell, bool canWri
     partial void OnSelectedChanged(ComputerSummary? value)
     {
         Detail = null;
+        UninstallCode = null;
         if (value is not null)
         {
             _ = RunAsync(() => LoadDetailAsync(value.Id));
@@ -275,6 +277,31 @@ public sealed partial class ComputersViewModel(ShellViewModel shell, bool canWri
             await FetchAsync();
         }
     });
+
+    // ---- uninstall code
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasUninstallCode), nameof(UninstallCommand))]
+    public partial UninstallCodeResponse? UninstallCode { get; set; }
+
+    public bool HasUninstallCode => UninstallCode is not null;
+
+    public string UninstallCommand => UninstallCode?.Command ?? string.Empty;
+
+    [RelayCommand]
+    private Task UninstallCodeAsync() => RunAsync(async () =>
+    {
+        if (Selected is { } computer && shell.Ui.Confirm("Uninstall code",
+                $"Create a code that allows removing the security agent from {computer.Hostname} during the next 24 hours? This is recorded in the audit log."))
+        {
+            UninstallCode = await shell.Api.CreateUninstallCodeAsync(computer.Id);
+        }
+    });
+
+    [RelayCommand]
+    private void CopyUninstall() => shell.Ui.CopyToClipboard(UninstallCommand);
+
+    [RelayCommand]
+    private void CopyUninstallCode() => shell.Ui.CopyToClipboard(UninstallCode?.Code ?? string.Empty);
 
     [RelayCommand]
     private Task SavePolicyAsync() => RunAsync(async () =>

@@ -91,3 +91,6 @@ public static class Exemptions
 public sealed record RecoveryKeyResponse(long Id, string Drive, string ProtectorId, DateTimeOffset FirstReportedUtc, DateTimeOffset LastReportedUtc);
 
 public sealed record RecoveryKeyRevealResponse(long Id, string Drive, string RecoveryPassword);
+
+/// <summary>Permission to remove the agent from one computer (valid 24 hours), and the command to use it.</summary>
+public sealed record UninstallCodeResponse(string Code, DateTimeOffset ExpiresAtUtc, string Command);

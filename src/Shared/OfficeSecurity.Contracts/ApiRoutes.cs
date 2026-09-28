@@ -79,6 +79,7 @@ public static class ApiRoutes
     public static string ComputerApprove(Guid id) => $"{Computers}/{id}/approve";
     public static string ComputerReject(Guid id) => $"{Computers}/{id}/reject";
     public static string ComputerRetire(Guid id) => $"{Computers}/{id}/retire";
+    public static string ComputerUninstallCode(Guid id) => $"{Computers}/{id}/uninstall-code";
     public static string ComputerPolicy(Guid id) => $"{Computers}/{id}/policy";
     public static string ComputerStaff(Guid id) => $"{Computers}/{id}/staff";
     public static string PolicyById(Guid id) => $"{Policies}/{id}";
