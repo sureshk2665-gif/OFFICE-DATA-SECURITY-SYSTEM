@@ -93,6 +93,17 @@ Accepted limitations:
   - Website blocking cannot stop uploads to *allowed* websites.
   - External USB hard disks reported as fixed disks may not be covered (to be verified with hardware).
 
+## Phase 5 part 2 status (ADR-0009)
+- **Application Control:** programs brought in by users are blocked (Enforce) or reported (Audit). Windows
+  enforces it in the kernel; removing the policy is detected and reversed within a minute.
+- **Records:** Windows sign-ins, failed sign-ins and file access in company folders are recorded from Windows'
+  own Security log. A local administrator can clear that log, but events already forwarded stay on the server.
+- **Ransomware protection** relies on Microsoft Defender being the active antivirus.
+- **Accepted:**
+  - scripts are not restricted
+  - programs in admin-writable folders are trusted
+  - BitLocker is only checked, not switched on
+
 ## Residual risks (accepted, documented to owner)
 Local administrators can disable controls. Screenshots, photographs and uploads to *allowed* websites cannot be
 fully prevented without extra DLP products (plan §14).

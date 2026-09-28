@@ -78,6 +78,17 @@ STEP 8 - Security policies (what is blocked)
     - Stop staff installing programs for themselves.
     - Blocked websites and no private browsing (Edge, Chrome, Firefox).
     - Programs without network access (full path of the program).
+    - Programs staff bring in (Application Control, Windows 11 22H2 or later):
+      only Windows, Microsoft programs and programs installed in Program Files may run.
+      ALWAYS use "Audit" for a few days first: "Security Events" then lists every
+      program that WOULD be blocked. Install needed programs properly (per-machine,
+      in Program Files) before choosing "Enforce". On such computers put the staff
+      app in C:\Program Files\OfficeSecurity\StaffApp.
+    - Record Windows sign-ins (who signed in, failed sign-ins, sign-outs).
+    - Company folders: record who opens, changes or deletes files there, and
+      ransomware protection (needs Microsoft Defender as the antivirus).
+    - Require BitLocker: each computer reports whether its drives are encrypted
+      (it does not switch BitLocker on for you).
   Items marked "not available yet" are saved but have no effect.
   TIP: create a test policy, assign it to ONE computer, check it for a day, then use it
   for everyone. Use "Audit" first for USB drives to see who uses them.
