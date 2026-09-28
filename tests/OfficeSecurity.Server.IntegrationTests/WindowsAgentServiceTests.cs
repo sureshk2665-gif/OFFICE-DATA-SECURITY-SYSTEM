@@ -202,11 +202,14 @@ public sealed partial class WindowsAgentServiceTests(ITestOutputHelper output)
         var edge = new[] { Environment.SpecialFolder.ProgramFilesX86, Environment.SpecialFolder.ProgramFiles }
             .Select(f => Path.Combine(Environment.GetFolderPath(f), @"Microsoft\Edge\Application\msedge.exe")).FirstOrDefault(File.Exists);
         Assert.True(edge is not null, "Microsoft Edge is not installed on the test machine.");
+        // example.com and example.org serve the same "Example Domain" page; only example.com is on the blocked list.
         var blockedPage = await EdgeDomAsync(edge, "https://example.com/");
-        var allowedPage = await EdgeDomAsync(edge, "https://www.microsoft.com/");
-        output.WriteLine($"Edge, blocked site: {(blockedPage.Contains("ERR_BLOCKED_BY_ADMINISTRATOR", StringComparison.Ordinal) ? "refused (ERR_BLOCKED_BY_ADMINISTRATOR)" : "NOT refused")}; allowed site: {allowedPage.Length} characters loaded");
-        Assert.Contains("ERR_BLOCKED_BY_ADMINISTRATOR", blockedPage, StringComparison.Ordinal);
-        Assert.DoesNotContain("ERR_BLOCKED_BY_ADMINISTRATOR", allowedPage, StringComparison.Ordinal);
+        var allowedPage = await EdgeDomAsync(edge, "https://example.org/");
+        output.WriteLine($"Edge, blocked site (example.com): {Snippet(blockedPage)}");
+        output.WriteLine($"Edge, allowed site (example.org): {Snippet(allowedPage)}");
+        Assert.Contains("Example Domain", allowedPage, StringComparison.Ordinal);
+        Assert.DoesNotContain("Example Domain", blockedPage, StringComparison.Ordinal);
+        Assert.True(blockedPage.Length > 0, "Edge returned nothing for the blocked site.");
 
         // Effect 2: the blocked program cannot reach the internet; the same program elsewhere can.
         var blockedExit = await RunAsync(_blockedCurl, "-sS", "-o", "NUL", "--max-time", "20", "https://www.microsoft.com/");
@@ -256,6 +259,15 @@ public sealed partial class WindowsAgentServiceTests(ITestOutputHelper output)
             var states = d!.Controls.ToDictionary(c => c.Control, c => c.State);
             return states.Count > 0 && condition(states) ? d : null;
         }, TimeSpan.FromSeconds(150), what);
+
+    /// <summary>The visible text of a page, shortened for the test log.</summary>
+    private static string Snippet(string html)
+    {
+        var text = System.Text.RegularExpressions.Regex.Replace(System.Text.RegularExpressions.Regex.Replace(html, "<(script|style)[^>]*>.*?</\\1>", " ",
+            System.Text.RegularExpressions.RegexOptions.Singleline | System.Text.RegularExpressions.RegexOptions.IgnoreCase), "<[^>]+>", " ");
+        text = System.Text.RegularExpressions.Regex.Replace(text, "\\s+", " ").Trim();
+        return text.Length > 400 ? text[..400] + "…" : text;
+    }
 
     private static async Task<string> EdgeDomAsync(string edge, string url)
     {
