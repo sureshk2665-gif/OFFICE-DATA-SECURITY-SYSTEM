@@ -158,6 +158,23 @@ public sealed class Part3EnforcementTests : IDisposable
         Assert.False(radios.Adapters.Values.Single());
     }
 
+    [Fact]
+    public async Task Bluetooth_adapter_that_was_already_off_stays_off_when_the_setting_is_removed()
+    {
+        var radios = new InMemoryBluetooth();
+        radios.Adapters["BT-ON"] = false;
+        radios.Adapters["BT-ALREADY-OFF"] = true;
+        var enforcer = new BluetoothEnforcer(radios, _store, _events, _clock);
+
+        await enforcer.ApplyAsync(Policy(s => s with { Bluetooth = new() { Mode = BluetoothMode.DisableRadio } }), default);
+        await enforcer.ApplyAsync(Policy(s => s with { Bluetooth = new() { Mode = BluetoothMode.DisableRadio } }), default);
+        await enforcer.ApplyAsync(Policy(s => s), default);
+
+        Assert.False(radios.Adapters["BT-ON"]);
+        Assert.True(radios.Adapters["BT-ALREADY-OFF"]);
+        Assert.Empty(_events.Raised);
+    }
+
     [Theory]
     [InlineData(EnforcementMode.Enforce, ControlState.PartiallyEnforced)]
     [InlineData(EnforcementMode.Audit, ControlState.AuditOnly)]

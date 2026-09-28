@@ -88,8 +88,8 @@ Accepted limitations:
 - **Local administrators** can undo settings between checks or stop the agent. Staff must use standard Windows
   accounts; otherwise they can defeat any client-side control.
 - **Other routes around the controls:**
-  - Portable programs, other browsers and copies of blocked programs are not stopped until Application Control
-    exists.
+  - Portable programs, other browsers and copies of blocked programs are only stopped by Application Control
+    (part 2).
   - Website blocking cannot stop uploads to *allowed* websites.
   - External USB hard disks reported as fixed disks may not be covered (to be verified with hardware).
 
@@ -103,6 +103,21 @@ Accepted limitations:
   - scripts are not restricted
   - programs in admin-writable folders are trusted
   - BitLocker is only checked, not switched on
+
+## Phase 5 part 3 status (ADR-0010)
+- **Approved USB drives** are identified by Windows' device instance ID, which includes the drive's serial number.
+  A drive without a unique serial number, or a device built to copy another drive's IDs, could pass as approved.
+  Only approve company drives, and prefer drives with a hardware serial number.
+- **Wi-Fi restriction** hides other networks (Windows WLAN filters). The safety rule means a computer already on an
+  unlisted network keeps using it until someone adds it or it disconnects; this is reported. Cable networks and
+  USB network adapters (phone tethering over a cable) are not covered.
+- **Bluetooth file transfer** is blocked by denying Windows' own transfer program under Application Control.
+  Other Bluetooth file programs would also need blocking by Application Control; switching the radio off covers
+  everything.
+- **BitLocker recovery keys** are sensitive: anyone with a key can unlock that drive. They are stored encrypted
+  with the server's data-protection key, only super administrators can show one, and every reveal is in the
+  tamper-evident audit log. Whoever can read the server's data folder *and* its protection keys could decrypt
+  them; keep the server PC and its backups secured.
 
 ## Residual risks (accepted, documented to owner)
 Local administrators can disable controls. Screenshots, photographs and uploads to *allowed* websites cannot be

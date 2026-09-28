@@ -18,7 +18,7 @@
 | `sessions` | Signed-in sessions (SHA-256 of token), last seen, expiry, end reason, source IP, computer (staff) | Unique `TokenHash`; index (`PrincipalType`, `PrincipalId`) |
 | `computers` | Enrolled computers: status (PendingApproval, Trusted, Rejected, Retired), certificate thumbprint, last seen, inventory JSON, control status JSON, assigned policy, per-computer policy version | Unique `CertificateThumbprint`; indexes on `Status`, `Hostname`; FK `PolicyId` → policies |
 | `enrollment_codes` | One-time computer enrollment codes (hash only) | Unique `CodeHash` |
-| `device_inventory` | Removable/phone/Bluetooth devices per computer, first/last seen, connected flag | Unique (`ComputerId`, `InstanceId`) |
+| `device_inventory` | Removable/phone/Bluetooth devices per computer, first/last seen, connected flag; `ParentInstanceId` (the USB device a disk belongs to, used when approving a drive) | Unique (`ComputerId`, `InstanceId`) |
 | `security_events` | Events uploaded by agents | Unique (`ComputerId`, `EventId`) for idempotent uploads; indexes by computer/time and type/time |
 | `policies` | Named policies; `SettingsJson` holds `PolicySettings`; one `IsDefault` | Unique `Name` |
 | `staff_computer_assignments` | Which staff may sign in on which computers | PK (`StaffId`, `ComputerId`) |
@@ -28,6 +28,7 @@
 | `software_requests` | Staff requests: program, reason, computer (from the sign-in ticket), status, reviewer, note, resulting installation | Indexes on (`Status`, `CreatedAtUtc`), `StaffId` |
 | `deployment_jobs` | Installations: installer, computer, originating request, status (Queued, Running, Succeeded, SucceededRebootRequired, Failed, Cancelled), attempts, exit code, message | Index (`ComputerId`, `Status`); FK `PackageId` (restrict) |
 | `control_exemptions` | Temporary per-computer exceptions: control, reason, start, end, creator, revoked time | Index (`ComputerId`, `ExpiresAtUtc`); FK `ComputerId` (cascade) |
+| `bitlocker_recovery_keys` | BitLocker recovery keys reported by agents: drive, key protector ID, the recovery password **encrypted** with the server's data-protection key (`ProtectedPassword`), first/last reported. Old keys are kept. | Unique (`ComputerId`, `ProtectorId`); FK `ComputerId` (cascade) |
 | `audit_log` | Append-only, hash-chained audit trail | Triggers `audit_log_no_update` / `audit_log_no_delete` reject changes; indexes on `OccurredAtUtc`, `Action` |
 
 ## Audit hash chain
@@ -45,4 +46,5 @@ Each entry stores:
 ## Not stored
 
 Plain-text passwords, setup codes, session tokens and TOTP secrets are never stored. An automated test scans
-the raw database file for them.
+the raw database file for them. BitLocker recovery passwords are stored only encrypted; a test also scans the raw
+database file for the plain-text key.

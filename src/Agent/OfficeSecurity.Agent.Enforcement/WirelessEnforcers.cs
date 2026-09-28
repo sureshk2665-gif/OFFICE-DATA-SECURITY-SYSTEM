@@ -144,7 +144,10 @@ public sealed class BluetoothEnforcer(IBluetoothRadios radios, IManagedSettingsS
         if (policy.Bluetooth.Mode == BluetoothMode.DisableRadio)
         {
             var all = radios.Radios();
-            store.Save(Control, [.. managed.Where(m => !all.Any(r => r.InstanceId.Equals(m.Name, StringComparison.OrdinalIgnoreCase))), .. all.Select(r => new PolicyValue(Key, r.InstanceId, 1))]);
+            // Only adapters this system switches off are remembered (and switched on again later); one that was
+            // already off stays off.
+            store.Save(Control, [.. managed, .. all.Where(r => !r.Disabled && !managed.Any(m => m.Name.Equals(r.InstanceId, StringComparison.OrdinalIgnoreCase)))
+                .Select(r => new PolicyValue(Key, r.InstanceId, 1))]);
             var restored = new List<string>();
             foreach (var radio in all.Where(r => !r.Disabled))
             {

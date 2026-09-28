@@ -88,7 +88,23 @@ STEP 8 - Security policies (what is blocked)
     - Company folders: record who opens, changes or deletes files there, and
       ransomware protection (needs Microsoft Defender as the antivirus).
     - Require BitLocker: each computer reports whether its drives are encrypted
-      (it does not switch BitLocker on for you).
+      (it does not switch BitLocker on for you). The recovery keys of encrypted
+      drives are sent to the server and stored encrypted. On the computer's page,
+      "BitLocker recovery keys" -> "Show selected recovery key" (super administrators
+      only; every time is recorded in the audit log).
+    - Approved USB drives: while USB drives are blocked (Enforce), company drives can
+      still be used. Plug the drive into an approved computer once, open that computer's
+      page, select the drive (type DiskDrive) in the device list, type a description
+      and click "Approve this USB drive". It then works on every computer using that
+      policy; other USB drives stay blocked. Programs can never be run from a USB drive.
+      Remove approvals in "Security Policies" (list "Approved USB drives").
+    - Allowed Wi-Fi networks: only these networks can be joined (stops phone hotspots).
+      SAFETY RULE: a computer connected to a network NOT on the list does not apply the
+      restriction (so it is never cut off) and reports this - add that network first.
+      Cable (wired) network is not affected.
+    - Bluetooth: "BlockFileTransfer" stops sending files over Bluetooth (needs Application
+      Control on Enforce); keyboards, mice and headsets keep working. "DisableRadio"
+      switches Bluetooth off completely, including wireless keyboards and headsets.
   Items marked "not available yet" are saved but have no effect.
   TIP: create a test policy, assign it to ONE computer, check it for a day, then use it
   for everyone. Use "Audit" first for USB drives to see who uses them.
@@ -129,6 +145,21 @@ Removing the agent from a computer (administrator Command Prompt):
   This also removes every protection the agent set (USB, websites, firewall rules...).
   Then remove the computer in the dashboard (Computers -> Remove from management).
 Checking the agent on a computer:  ...\OfficeSecurity.Agent.exe status
+
+PILOT CHECKLIST - try the protections on ONE test computer first (not a production PC)
+  1. Assign a test policy with the protection switched on and wait 2 minutes.
+  2. On that computer open an administrator Command Prompt and run:
+       "C:\Program Files\OfficeSecurity\Agent\OfficeSecurity.Agent.exe" check
+     It tests, on that computer, what the policy asks for and prints a line per check:
+     ✓ = working as the policy says, ✗ = problem. It is safe: it only reads.
+  3. Try it for real, with the check command after each step:
+     - plug in a personal USB drive  -> it must NOT open (✓ "cannot be read")
+     - plug in an approved USB drive -> it must open
+     - connect a phone               -> no files visible (charging works)
+     - try to join a phone hotspot   -> not listed (if Wi-Fi networks are restricted)
+     - send a file over Bluetooth    -> refused (if Bluetooth file transfer is blocked)
+  4. Check the dashboard: the computer's "Security protections" and "Security Events".
+  5. Only then assign the policy to other computers.
 
 Good to know
   - 5 wrong attempts lock an account for 15 minutes.

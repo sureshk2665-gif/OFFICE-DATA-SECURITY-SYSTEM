@@ -98,6 +98,8 @@ Every endpoint in this group is anonymous and rate-limited.
 | `GET /api/v1/computers/{id}/exemptions` | AdminRead | → `ExemptionResponse[]` (latest 50) |
 | `POST /api/v1/computers/{id}/exemptions` | AdminWrite | `CreateExemptionRequest` (control, reason, 5–43200 minutes; approved computers only) → `ExemptionResponse` |
 | `DELETE /api/v1/computers/{id}/exemptions/{exemptionId}` | AdminWrite | → 204 (ends it early; 409 if already ended) |
+| `GET /api/v1/computers/{id}/recovery-keys` | AdminRead | → `RecoveryKeyResponse[]` (drive, key ID, dates; never the key itself) |
+| `POST /api/v1/computers/{id}/recovery-keys/{keyId}/reveal` | **SuperAdmin** | → `RecoveryKeyRevealResponse` with the recovery password; audited as `bitlocker.recovery-key.reveal` |
 
 Policy types (`PolicySettings`, `PolicyDetail`, …) are in `src/Shared/OfficeSecurity.Policy`.
 
