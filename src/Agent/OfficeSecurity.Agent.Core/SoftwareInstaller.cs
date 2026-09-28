@@ -140,6 +140,8 @@ public sealed partial class InstallationProcessor(
     PendingEventStore events,
     ILogger logger)
 {
+    private const string UnsignedNotAllowed = "it has no digital signature and unsigned installers were not allowed for it.";
+
     public async Task ProcessAsync(AgentServerClient client, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(client);
@@ -176,7 +178,16 @@ public sealed partial class InstallationProcessor(
             InstallerOutcome outcome;
             if (failure is not null)
             {
-                events.Enqueue(SecurityEventType.PolicyTamperAttempt, EventSeverities.Critical, $"Installer for {job.SoftwareName} was NOT run: {failure}");
+                // A file that differs from the approved one may have been tampered with; an unsigned file that
+                // needs a signature is a set-up problem (the administrator's choice), not an attack.
+                if (failure == UnsignedNotAllowed)
+                {
+                    events.Enqueue(SecurityEventType.UnauthorizedSoftwareInstallAttempt, EventSeverities.Warning, $"Installer for {job.SoftwareName} was NOT run: {failure}");
+                }
+                else
+                {
+                    events.Enqueue(SecurityEventType.PolicyTamperAttempt, EventSeverities.Critical, $"Installer for {job.SoftwareName} was NOT run: {failure}");
+                }
                 outcome = new InstallerOutcome(JobStatuses.Failed, null, "Not installed: " + failure);
             }
             else
@@ -226,7 +237,7 @@ public sealed partial class InstallationProcessor(
             case SignatureState.NotSigned when job.AllowUnsigned:
                 return null;
             case SignatureState.NotSigned:
-                return "it has no digital signature and unsigned installers were not allowed for it.";
+                return UnsignedNotAllowed;
             case SignatureState.Unavailable when job.AllowUnsigned:
                 return null;
             default:
