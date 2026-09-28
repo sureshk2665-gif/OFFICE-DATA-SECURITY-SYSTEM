@@ -3,9 +3,12 @@
 Centralized Windows computer management, file safety and security enforcement for an office LAN.
 There is no screen monitoring, screen recording, screenshots, keystroke logging, webcam or microphone capture.
 
-> **Status: Phase 4 (software inventory, requests, approved installation) complete — development build only.**
-> **No blocking control is enforced yet.** Unapproved software is reported, not blocked; USB, application and
-> file protection arrive in Phase 5. Every control is reported as `NotImplemented` until its phase is delivered and tested.
+> **Status: Phase 5 part 1 (first security controls) complete — development build only.**
+> Enforced now: USB drives, memory cards, phones and CD/DVD; staff software installation (partly); websites and
+> private browsing in Edge/Chrome/Firefox; programs blocked from the network; agent self-protection; temporary
+> per-computer exceptions. Each is reported per computer only after Windows confirms it.
+> **Not yet available** (reported as `NotImplemented`, no effect): Application Control, Bluetooth, Wi-Fi
+> restriction, approved USB devices by ID, file protection, encryption, backup, Windows sign-in restriction.
 
 ## Getting the `.exe` files
 
@@ -31,17 +34,17 @@ Every push is built on a Windows machine by GitHub Actions:
 | 2 | Database, admin sign-in with two-step verification, staff accounts, roles, tamper-evident audit log, pinned HTTPS | **Done** |
 | 3 | Computer enrollment and approval, agent Windows Service, mutual TLS, signed policy distribution, offline queue, device inventory, staff restricted to computers | **Done** |
 | 4 | Software inventory, installation requests and approvals, approved deployment with hash and signature checks | **Done** |
-| 5 | USB / device control, application control, network & browser restrictions, file protection | Next |
+| 5 | **Part 1 done:** USB/phone/CD-DVD blocking, staff install restriction, website & private browsing, program network blocking, agent self-protection, temporary exceptions. **Next parts:** Application Control, approved USB devices, Bluetooth, Wi-Fi, file protection | In progress |
 | 6 | Security events, alerts, audit log, reports (CSV/PDF) | Planned |
 | 7 | MSI installers, full testing, pilot deployment | Planned |
 
 ## Documentation
 
 - [Architecture & implementation plan](docs/00-ARCHITECTURE-AND-PLAN.md)
-- [Decisions (ADRs)](docs/adr/): default assumptions, database, identity & trust, packaging, authentication, agent enrollment, software management
+- [Decisions (ADRs)](docs/adr/): default assumptions, database, identity & trust, packaging, authentication, agent enrollment, software management, security enforcement
 - [Threat model](docs/security/threat-model.md)
 - [API reference](docs/api/README.md) · [Database schema](docs/database/schema.md)
-- [Phase 2 test report](docs/testing/phase-2-test-report.md) · [Phase 3 test report](docs/testing/phase-3-test-report.md) · [Phase 4 test report](docs/testing/phase-4-test-report.md)
+- [Phase 2 test report](docs/testing/phase-2-test-report.md) · [Phase 3 test report](docs/testing/phase-3-test-report.md) · [Phase 4 test report](docs/testing/phase-4-test-report.md) · [Phase 5 part 1 test report](docs/testing/phase-5-part-1-test-report.md)
 
 ## For developers
 

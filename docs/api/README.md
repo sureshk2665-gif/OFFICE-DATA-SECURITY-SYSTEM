@@ -95,6 +95,9 @@ Every endpoint in this group is anonymous and rate-limited.
 | `POST /api/v1/policies` | AdminWrite | `SavePolicyRequest` → `PolicyDetail` |
 | `PUT /api/v1/policies/{id}` | AdminWrite | `SavePolicyRequest` → `PolicyDetail` |
 | `DELETE /api/v1/policies/{id}` | AdminWrite | → 204 (default or assigned policy → 409) |
+| `GET /api/v1/computers/{id}/exemptions` | AdminRead | → `ExemptionResponse[]` (latest 50) |
+| `POST /api/v1/computers/{id}/exemptions` | AdminWrite | `CreateExemptionRequest` (control, reason, 5–43200 minutes; approved computers only) → `ExemptionResponse` |
+| `DELETE /api/v1/computers/{id}/exemptions/{exemptionId}` | AdminWrite | → 204 (ends it early; 409 if already ended) |
 
 Policy types (`PolicySettings`, `PolicyDetail`, …) are in `src/Shared/OfficeSecurity.Policy`.
 

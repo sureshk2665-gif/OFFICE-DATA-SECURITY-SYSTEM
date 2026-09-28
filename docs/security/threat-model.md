@@ -73,6 +73,26 @@ Accepted risks (ADR-0007):
 - The file is verified and then run from the agent's data folder. Between those two steps only SYSTEM and
   administrators can modify it.
 
+## Phase 5 part 1 status (ADR-0008)
+Implemented:
+- **Blocking:** USB drives, memory cards, CD/DVD and phones are blocked through Windows Removable Storage Access
+  policies. Staff per-user MSI and packaged-app installs are blocked. Edge, Chrome and Firefox get website
+  lists and have private browsing disabled. Windows Firewall rules block the listed programs.
+- **Tampering:** every protection is re-checked every minute. A change by anyone else is reversed and raises a
+  Critical `PolicyTamperAttempt` event. The service's own start, restart and permission settings are checked
+  and restored the same way.
+- **Exceptions** are time-limited, administrator-only, part of the signed policy (staff cannot forge them) and
+  audited.
+
+Accepted limitations:
+- **Local administrators** can undo settings between checks or stop the agent. Staff must use standard Windows
+  accounts; otherwise they can defeat any client-side control.
+- **Other routes around the controls:**
+  - Portable programs, other browsers and copies of blocked programs are not stopped until Application Control
+    exists.
+  - Website blocking cannot stop uploads to *allowed* websites.
+  - External USB hard disks reported as fixed disks may not be covered (to be verified with hardware).
+
 ## Residual risks (accepted, documented to owner)
 Local administrators can disable controls. Screenshots, photographs and uploads to *allowed* websites cannot be
 fully prevented without extra DLP products (plan §14).

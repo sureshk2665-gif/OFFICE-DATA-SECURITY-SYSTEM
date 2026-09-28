@@ -27,6 +27,7 @@
 | `software_packages` | Uploaded installer files: file name, type (Msi/Exe), SHA-256, size, silent options, required signer, unsigned allowed; the file itself is `packages\{id}.pkg` in the data folder | FK `ApprovedSoftwareId` (restrict) |
 | `software_requests` | Staff requests: program, reason, computer (from the sign-in ticket), status, reviewer, note, resulting installation | Indexes on (`Status`, `CreatedAtUtc`), `StaffId` |
 | `deployment_jobs` | Installations: installer, computer, originating request, status (Queued, Running, Succeeded, SucceededRebootRequired, Failed, Cancelled), attempts, exit code, message | Index (`ComputerId`, `Status`); FK `PackageId` (restrict) |
+| `control_exemptions` | Temporary per-computer exceptions: control, reason, start, end, creator, revoked time | Index (`ComputerId`, `ExpiresAtUtc`); FK `ComputerId` (cascade) |
 | `audit_log` | Append-only, hash-chained audit trail | Triggers `audit_log_no_update` / `audit_log_no_delete` reject changes; indexes on `OccurredAtUtc`, `Action` |
 
 ## Audit hash chain

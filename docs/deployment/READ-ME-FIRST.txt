@@ -67,11 +67,27 @@ STEP 7 - Staff on that computer
   To restrict a staff member to certain computers: Computers -> select the computer ->
   tick the staff member under "Staff allowed to sign in on this computer" -> Save.
 
-STEP 8 - Policies and events
+STEP 8 - Security policies (what is blocked)
   "Security Policies": edit the default policy or create others and assign them to
-  computers (Computers -> Security policy). Computers receive the signed policy at their
-  next check-in. The controls are not enforced until Phase 5; each computer shows
-  "NotImplemented" for them.
+  computers (Computers -> Security policy). Computers apply a changed policy within
+  a minute of their next check-in. Available now:
+    - USB drives and memory cards: Off / Audit (record only) / Enforce (block).
+      Optionally also phones and cameras (file transfer) and CD/DVD drives.
+      Keyboards, mice and printers keep working. A drive that is already plugged in
+      must be unplugged and plugged in again.
+    - Stop staff installing programs for themselves.
+    - Blocked websites and no private browsing (Edge, Chrome, Firefox).
+    - Programs without network access (full path of the program).
+  Items marked "not available yet" are saved but have no effect.
+  TIP: create a test policy, assign it to ONE computer, check it for a day, then use it
+  for everyone. Use "Audit" first for USB drives to see who uses them.
+  On each computer's page, "Security protections" shows what Windows has actually
+  applied ("On (verified)"). If anyone changes a protection by hand, the agent puts it
+  back within a minute and you see a Critical "PolicyTamperAttempt" event.
+  Temporary exception: on a computer's page, "Temporary exceptions" lets you allow, for
+  example, USB drives on that one computer for 1 hour. It switches back on by itself.
+
+STEP 8b - Events
   "Security Events": everything the computers report. "USB connection log" shows USB
   drives, phones and Bluetooth devices being connected.
 
@@ -99,6 +115,7 @@ STEP 10 - Look at the audit log
 
 Removing the agent from a computer (administrator Command Prompt):
   "C:\Program Files\OfficeSecurity\Agent\OfficeSecurity.Agent.exe" uninstall
+  This also removes every protection the agent set (USB, websites, firewall rules...).
   Then remove the computer in the dashboard (Computers -> Remove from management).
 Checking the agent on a computer:  ...\OfficeSecurity.Agent.exe status
 
