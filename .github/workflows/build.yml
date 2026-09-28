@@ -106,10 +106,19 @@ jobs:
           & "publish/OfficeSecurity-win-x64/Agent/OfficeSecurity.Agent.exe" inventory
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-      - name: Agent Windows Service end-to-end test (install, approve, policy, kill and recover, uninstall)
+      - name: Build the test MSI used by the end-to-end test (WiX Toolset 5)
+        shell: pwsh
+        run: |
+          dotnet tool install --global wix --version 5.0.2
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          wix build tests/windows/ocss-test-package.wxs -arch x64 -bindpath tests/windows -o "$env:RUNNER_TEMP\ocss-test.msi"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Agent Windows Service end-to-end test (install, approve, policy, kill and recover, install software, uninstall)
         shell: pwsh
         env:
           OCSS_AGENT_EXE: ${{ github.workspace }}\publish\OfficeSecurity-win-x64\Agent\OfficeSecurity.Agent.exe
+          OCSS_TEST_MSI: ${{ runner.temp }}\ocss-test.msi
         run: >
           dotnet test tests/OfficeSecurity.Server.IntegrationTests/OfficeSecurity.Server.IntegrationTests.csproj
           --configuration Release --no-build --filter "Category=WindowsService"

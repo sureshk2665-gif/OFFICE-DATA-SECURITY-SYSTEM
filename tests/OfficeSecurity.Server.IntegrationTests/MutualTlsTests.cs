@@ -44,6 +44,38 @@ public sealed class MutualTlsTests
     }
 
     [Fact]
+    public async Task Large_installer_is_uploaded_and_installed_over_real_https()
+    {
+        await using var server = StartKestrel();
+        var owner = await server.OwnerTokenAsync();
+        using var admin = AdminClient(server, owner);
+        using var agent = await ComputerLifecycleTests.EnrolledAgentAsync(server, owner, admin, useRealTls: true);
+
+        // 40 MB: above the web server's default 30 MB request limit.
+        var installer = new byte[40 * 1024 * 1024];
+        new Random(4).NextBytes(installer);
+        using var api = new Client.Core.ApiClient(admin);
+        var title = await api.CreateApprovedSoftwareAsync(new SaveApprovedSoftwareRequest("Contoso Designer", "Contoso Ltd", null));
+        long reported = 0;
+        using var content = new MemoryStream(installer);
+        var package = await api.UploadPackageAsync(title.Id, new UploadPackageOptions("designer.msi", InstallerTypes.Msi, null, "CN=Contoso Ltd", false),
+            content, new SynchronousProgress(v => reported = v));
+        Assert.Equal(installer.Length, package.SizeBytes);
+        Assert.Equal(installer.Length, reported);
+        Assert.Equal(Convert.ToHexStringLower(SHA256.HashData(installer)), package.Sha256);
+
+        await api.CreateDeploymentsAsync(new CreateDeploymentRequest(package.Id, [agent.ComputerId]));
+        await agent.RunUntilAsync(() => agent.Runner.Runs.Count > 0);
+        Assert.Equal(installer, Assert.Single(agent.Runner.Runs).Content);
+        Assert.Equal(JobStatuses.Succeeded, Assert.Single((await api.ListDeploymentsAsync(1, 10, agent.ComputerId, null)).Items).Status);
+    }
+
+    private sealed class SynchronousProgress(Action<long> report) : IProgress<long>
+    {
+        public void Report(long value) => report(value);
+    }
+
+    [Fact]
     public async Task Foreign_client_certificate_is_refused_over_tls()
     {
         await using var server = StartKestrel();

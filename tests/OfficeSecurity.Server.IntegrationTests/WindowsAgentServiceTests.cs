@@ -20,6 +20,9 @@ public sealed class WindowsServiceFactAttribute : FactAttribute
 {
     public const string AgentExeVariable = "OCSS_AGENT_EXE";
 
+    /// <summary>A small unsigned test MSI (built by the CI pipeline) that the service installs for real.</summary>
+    public const string TestMsiVariable = "OCSS_TEST_MSI";
+
     public WindowsServiceFactAttribute()
     {
         if (!OperatingSystem.IsWindows())
@@ -110,14 +113,68 @@ public sealed partial class WindowsAgentServiceTests(ITestOutputHelper output)
                 return e!.Items.Count(x => x.EventType == nameof(SecurityEventType.AgentStarted)) >= 2 ? e : null;
             }, TimeSpan.FromSeconds(90), "start-up events from both runs");
             Assert.Contains(events.Items, e => e.EventType == nameof(SecurityEventType.PolicyApplied));
+
+            // 8. Approved software installation with the real Windows installer (msiexec) and signature check.
+            await InstallTestMsiAsync(admin, pending.Id);
         }
         finally
         {
             var uninstall = await RunAsync(exe, "uninstall");
             Assert.Equal(0, uninstall);
+            if (Environment.GetEnvironmentVariable(WindowsServiceFactAttribute.TestMsiVariable) is { Length: > 0 } msi && File.Exists(msi))
+            {
+                await RunAsync(Path.Combine(Environment.SystemDirectory, "msiexec.exe"), "/x", msi, "/qn", "/norestart");
+            }
         }
 
         Assert.Contains("1060", await ScAsync("query", "OfficeSecurityAgent", allowFailure: true), StringComparison.Ordinal); // service does not exist
+    }
+
+    private async Task InstallTestMsiAsync(HttpClient admin, Guid computerId)
+    {
+        var msi = Environment.GetEnvironmentVariable(WindowsServiceFactAttribute.TestMsiVariable);
+        Assert.True(msi is { Length: > 0 } && File.Exists(msi), $"Set {WindowsServiceFactAttribute.TestMsiVariable} to the test MSI.");
+        var bytes = await File.ReadAllBytesAsync(msi);
+        const string name = "OCSS Test Package";
+        var title = await (await admin.PostAsJsonAsync(ApiRoutes.ApprovedSoftware, new SaveApprovedSoftwareRequest(name, "Office Security Tests", null)))
+            .EnsureSuccessStatusCode().Content.ReadFromJsonAsync<ApprovedSoftwareResponse>();
+
+        async Task<DeploymentResponse> DeployAsync(bool requireSignature)
+        {
+            var query = requireSignature ? "&signerSubject=CN%3DContoso%20Ltd&allowUnsigned=false" : "&allowUnsigned=true";
+            using var body = new ByteArrayContent(bytes);
+            var package = await (await admin.PostAsync(new Uri($"{ApiRoutes.ApprovedSoftwarePackages(title!.Id)}?fileName=ocss-test.msi&installerType=Msi{query}", UriKind.Relative), body))
+                .EnsureSuccessStatusCode().Content.ReadFromJsonAsync<SoftwarePackageResponse>();
+            var job = Assert.Single((await (await admin.PostAsJsonAsync(ApiRoutes.SoftwareDeployments, new CreateDeploymentRequest(package!.Id, [computerId])))
+                .EnsureSuccessStatusCode().Content.ReadFromJsonAsync<List<DeploymentResponse>>())!);
+            return await WaitForAsync(async () =>
+            {
+                var list = await admin.GetFromJsonAsync<PagedResult<DeploymentResponse>>($"{ApiRoutes.SoftwareDeployments}?computerId={computerId}");
+                return list!.Items.Single(d => d.Id == job.Id) is { FinishedAtUtc: not null } done ? done : null;
+            }, TimeSpan.FromMinutes(5), requireSignature ? "installation requiring a signature finished" : "installation finished");
+        }
+
+        // a) The test MSI has no signature: when the administrator required a signed installer, it is not run.
+        var refused = await DeployAsync(requireSignature: true);
+        output.WriteLine($"Signed-only installer: {refused.Status} - {refused.Message}");
+        Assert.Equal(JobStatuses.Failed, refused.Status);
+        Assert.Contains("no digital signature", refused.Message, StringComparison.Ordinal);
+
+        // b) Allowed unsigned: msiexec installs it silently and the new program appears in the inventory.
+        var installed = await DeployAsync(requireSignature: false);
+        output.WriteLine($"Unsigned allowed: {installed.Status} (exit code {installed.ExitCode}) - {installed.Message}");
+        Assert.Equal(JobStatuses.Succeeded, installed.Status);
+        Assert.Equal(0, installed.ExitCode);
+
+        var seen = await WaitForAsync(async () =>
+            (await admin.GetFromJsonAsync<List<InstalledSoftwareResponse>>($"{ApiRoutes.SoftwareInventoryComputers}?computerId={computerId}"))!
+                .FirstOrDefault(s => s.Name == name), TimeSpan.FromSeconds(90), "installed program reported in inventory");
+        Assert.True(seen.IsApproved);
+        Assert.Equal("1.0.0", seen.Version);
+
+        var events = await admin.GetFromJsonAsync<PagedResult<SecurityEventResponse>>($"{ApiRoutes.Events}?computerId={computerId}&pageSize=200");
+        Assert.Contains(events!.Items, e => e.EventType == nameof(SecurityEventType.SoftwareInstalled) && e.Details!.Contains(name, StringComparison.Ordinal));
+        Assert.Contains(events.Items, e => e.EventType == nameof(SecurityEventType.PolicyTamperAttempt) && e.Severity == EventSeverities.Critical);
     }
 
     private static async Task SavePolicyAsync(HttpClient admin, Guid id, Func<PolicySettings, PolicySettings> change)

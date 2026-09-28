@@ -280,14 +280,14 @@ public sealed class SoftwareService(IServerDbContext db, AuditLog audit, IPackag
         };
         db.SoftwareRequests.Add(entity);
         await audit.RecordAndSaveAsync(context, new AuditRecord("software.request", TargetType: "SoftwareRequest", TargetId: entity.Id.ToString(), Details: name), ct).ConfigureAwait(false);
-        return (await QueryRequests().Where(x => x.Request.Id == entity.Id).ToListAsync(ct).ConfigureAwait(false)).Select(ToResponse).Single();
+        return await RequestResponseAsync(entity.Id, ct).ConfigureAwait(false);
     }
 
     public async Task<IReadOnlyList<SoftwareRequestResponse>> ListMyRequestsAsync(RequestContext context, CancellationToken ct = default)
     {
         var staffId = context?.Principal?.Id ?? throw new InvalidOperationException("A signed-in staff member is required.");
-        var rows = await QueryRequests().Where(x => x.Request.StaffId == staffId).OrderByDescending(x => x.Request.CreatedAtUtc).Take(100).ToListAsync(ct).ConfigureAwait(false);
-        return rows.Select(ToResponse).ToList();
+        var rows = await QueryRequests().Where(r => r.StaffId == staffId).OrderByDescending(r => r.CreatedAtUtc).Take(100).ToListAsync(ct).ConfigureAwait(false);
+        return await ToResponsesAsync(rows, ct).ConfigureAwait(false);
     }
 
     public async Task<PagedResult<SoftwareRequestResponse>> ListRequestsAsync(int page, int pageSize, string? status, CancellationToken ct = default)
@@ -296,13 +296,13 @@ public sealed class SoftwareService(IServerDbContext db, AuditLog audit, IPackag
         var query = QueryRequests();
         if (Enum.TryParse<SoftwareRequestStatus>(status, true, out var statusFilter))
         {
-            query = query.Where(x => x.Request.Status == statusFilter);
+            query = query.Where(r => r.Status == statusFilter);
         }
 
         var total = await query.CountAsync(ct).ConfigureAwait(false);
-        var rows = await query.OrderBy(x => x.Request.Status == SoftwareRequestStatus.Pending ? 0 : 1).ThenByDescending(x => x.Request.CreatedAtUtc)
+        var rows = await query.OrderBy(r => r.Status == SoftwareRequestStatus.Pending ? 0 : 1).ThenByDescending(r => r.CreatedAtUtc)
             .Skip((page - 1) * pageSize).Take(pageSize).ToListAsync(ct).ConfigureAwait(false);
-        return new PagedResult<SoftwareRequestResponse>(rows.Select(ToResponse).ToList(), page, pageSize, total);
+        return new PagedResult<SoftwareRequestResponse>(await ToResponsesAsync(rows, ct).ConfigureAwait(false), page, pageSize, total);
     }
 
     public async Task<Result<SoftwareRequestResponse>> ApproveRequestAsync(Guid id, ApproveSoftwareRequest request, RequestContext context, CancellationToken ct = default)
@@ -339,7 +339,7 @@ public sealed class SoftwareService(IServerDbContext db, AuditLog audit, IPackag
         entity.DeploymentJobId = job.Id;
         await audit.RecordAndSaveAsync(context, new AuditRecord("software.request.approve", TargetType: "SoftwareRequest", TargetId: id.ToString(),
             Details: $"{entity.SoftwareName} → job {job.Id}"), ct).ConfigureAwait(false);
-        return (await QueryRequests().Where(x => x.Request.Id == id).ToListAsync(ct).ConfigureAwait(false)).Select(ToResponse).Single();
+        return await RequestResponseAsync(id, ct).ConfigureAwait(false);
     }
 
     public async Task<Result<SoftwareRequestResponse>> RejectRequestAsync(Guid id, RejectSoftwareRequest request, RequestContext context, CancellationToken ct = default)
@@ -361,7 +361,7 @@ public sealed class SoftwareService(IServerDbContext db, AuditLog audit, IPackag
         entity.ReviewedByAdminId = context?.Principal?.Id;
         entity.DecidedAtUtc = clock.GetUtcNow();
         await audit.RecordAndSaveAsync(context!, new AuditRecord("software.request.reject", TargetType: "SoftwareRequest", TargetId: id.ToString(), Details: entity.SoftwareName), ct).ConfigureAwait(false);
-        return (await QueryRequests().Where(x => x.Request.Id == id).ToListAsync(ct).ConfigureAwait(false)).Select(ToResponse).Single();
+        return await RequestResponseAsync(id, ct).ConfigureAwait(false);
     }
 
     // ---------------------------------------------------------------- inventory
@@ -596,20 +596,25 @@ public sealed class SoftwareService(IServerDbContext db, AuditLog audit, IPackag
             Details = Clean(details, 2000),
         });
 
-    private IQueryable<RequestRow> QueryRequests() =>
-        from r in db.SoftwareRequests.AsNoTracking()
-        join s in db.Staff.AsNoTracking() on r.StaffId equals s.Id
-        join c in db.Computers.AsNoTracking() on r.ComputerId equals c.Id into cj
-        from c in cj.DefaultIfEmpty()
-        join j in db.DeploymentJobs.AsNoTracking() on r.DeploymentJobId equals j.Id into jj
-        from j in jj.DefaultIfEmpty()
-        select new RequestRow(r, s.DisplayName, s.EmployeeCode, c == null ? null : c.Hostname, j == null ? null : (DeploymentStatus?)j.Status);
+    private IQueryable<SoftwareRequest> QueryRequests() => db.SoftwareRequests.AsNoTracking();
 
-    private sealed record RequestRow(SoftwareRequest Request, string StaffName, string EmployeeCode, string? ComputerName, DeploymentStatus? JobStatus);
+    private async Task<List<SoftwareRequestResponse>> ToResponsesAsync(List<SoftwareRequest> requests, CancellationToken ct)
+    {
+        var staffIds = requests.Select(r => r.StaffId).Distinct().ToList();
+        var computerIds = requests.Where(r => r.ComputerId is not null).Select(r => r.ComputerId!.Value).Distinct().ToList();
+        var jobIds = requests.Where(r => r.DeploymentJobId is not null).Select(r => r.DeploymentJobId!.Value).Distinct().ToList();
+        var staff = await db.Staff.AsNoTracking().Where(s => staffIds.Contains(s.Id)).ToDictionaryAsync(s => s.Id, ct).ConfigureAwait(false);
+        var computers = await db.Computers.AsNoTracking().Where(c => computerIds.Contains(c.Id)).ToDictionaryAsync(c => c.Id, c => c.Hostname, ct).ConfigureAwait(false);
+        var jobs = await db.DeploymentJobs.AsNoTracking().Where(j => jobIds.Contains(j.Id)).ToDictionaryAsync(j => j.Id, j => j.Status, ct).ConfigureAwait(false);
+        return requests.Select(r => new SoftwareRequestResponse(
+            r.Id, r.StaffId, staff.TryGetValue(r.StaffId, out var s) ? s.DisplayName : "(deleted)", staff.TryGetValue(r.StaffId, out var s2) ? s2.EmployeeCode : string.Empty,
+            r.ComputerId, r.ComputerId is { } cid && computers.TryGetValue(cid, out var host) ? host : null, r.SoftwareName, r.Reason,
+            r.Status.ToString(), r.ReviewNote, r.DeploymentJobId is { } jid && jobs.TryGetValue(jid, out var status) ? status.ToString() : null,
+            r.CreatedAtUtc, r.DecidedAtUtc)).ToList();
+    }
 
-    private static SoftwareRequestResponse ToResponse(RequestRow x) => new(
-        x.Request.Id, x.Request.StaffId, x.StaffName, x.EmployeeCode, x.Request.ComputerId, x.ComputerName, x.Request.SoftwareName, x.Request.Reason,
-        x.Request.Status.ToString(), x.Request.ReviewNote, x.JobStatus?.ToString(), x.Request.CreatedAtUtc, x.Request.DecidedAtUtc);
+    private async Task<SoftwareRequestResponse> RequestResponseAsync(Guid id, CancellationToken ct) =>
+        (await ToResponsesAsync(await QueryRequests().Where(r => r.Id == id).ToListAsync(ct).ConfigureAwait(false), ct).ConfigureAwait(false)).Single();
 
     private async Task<ServiceError?> ValidateApprovedAsync(SaveApprovedSoftwareRequest request, Guid? id, CancellationToken ct)
     {

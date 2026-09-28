@@ -2,6 +2,7 @@ using System.Security.Cryptography.X509Certificates;
 using Microsoft.Extensions.Logging.Abstractions;
 using OfficeSecurity.Agent.Core;
 using OfficeSecurity.Agent.Enforcement;
+using OfficeSecurity.Client.Core;
 using OfficeSecurity.Contracts;
 
 namespace OfficeSecurity.Server.IntegrationTests;
@@ -20,6 +21,28 @@ public sealed class TestInventory : IInventoryCollector
     public List<InstalledSoftware> Software { get; } = [];
 
     public IReadOnlyList<InstalledSoftware> CollectSoftware() => [.. Software];
+}
+
+/// <summary>Signature check stand-in: Windows' WinVerifyTrust is not available on every test machine.</summary>
+public sealed class TestVerifier : IInstallerVerifier
+{
+    public SignatureCheck Result { get; set; } = new(SignatureState.Valid, "CN=Contoso Ltd", null);
+
+    public SignatureCheck Check(string path) => Result;
+}
+
+/// <summary>Records what would be installed instead of running an installer.</summary>
+public sealed class TestInstallerRunner : IInstallerRunner
+{
+    public List<(AgentJob Job, byte[] Content)> Runs { get; } = [];
+
+    public InstallerOutcome Outcome { get; set; } = new(JobStatuses.Succeeded, 0, "Installed successfully.");
+
+    public Task<InstallerOutcome> RunAsync(AgentJob job, string installerPath, CancellationToken cancellationToken)
+    {
+        Runs.Add((job, File.ReadAllBytes(installerPath)));
+        return Task.FromResult(Outcome);
+    }
 }
 
 /// <summary>
@@ -49,8 +72,9 @@ public sealed class AgentHarness : IDisposable
         Events = new PendingEventStore(Paths, server.Clock);
         Runtime = new AgentRuntime(
             Config, Keys, Inventory, new EnforcementCoordinator([], server.Clock), Events, new PolicyCache(Paths), server.Clock,
-            NullLogger<AgentRuntime>.Instance, new AgentRuntimeOptions { AgentVersion = "1.2.3-test" },
-            useRealTls ? null : InMemoryClient);
+            NullLogger<AgentRuntime>.Instance, new AgentRuntimeOptions { AgentVersion = "1.2.3-test", RunInstallationsInline = true },
+            useRealTls ? null : InMemoryClient,
+            new InstallationProcessor(Paths, Verifier, Runner, Events, NullLogger.Instance));
     }
 
     public bool UseRealTls { get; }
@@ -64,6 +88,10 @@ public sealed class AgentHarness : IDisposable
     public PendingEventStore Events { get; }
 
     public TestInventory Inventory { get; } = new();
+
+    public TestVerifier Verifier { get; } = new();
+
+    public TestInstallerRunner Runner { get; } = new();
 
     public AgentRuntime Runtime { get; }
 

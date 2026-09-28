@@ -42,6 +42,8 @@ public sealed class AgentServerException : Exception
 /// </summary>
 public sealed class AgentServerClient : IDisposable
 {
+    private static readonly TimeSpan StallTimeout = TimeSpan.FromMinutes(2);
+
     private readonly HttpClient _http;
 
     public AgentServerClient(HttpClient http)
@@ -121,8 +123,25 @@ public sealed class AgentServerClient : IDisposable
             var buffer = new byte[81920];
             long total = 0;
             int read;
-            while ((read = await body.ReadAsync(buffer, ct).ConfigureAwait(false)) > 0)
+            // No overall time limit (large installers on slow links), but a stalled download is abandoned.
+            using var stall = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            while (true)
             {
+                stall.CancelAfter(StallTimeout);
+                try
+                {
+                    read = await body.ReadAsync(buffer, stall.Token).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException ex) when (!ct.IsCancellationRequested)
+                {
+                    throw new AgentServerException("The installer download stalled.", null, ex);
+                }
+
+                if (read == 0)
+                {
+                    break;
+                }
+
                 total += read;
                 if (total > maxBytes)
                 {

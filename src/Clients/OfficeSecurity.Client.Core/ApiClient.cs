@@ -43,15 +43,23 @@ public sealed class ApiClient : IDisposable
 {
     private readonly HttpClient _http;
 
+    /// <summary>For installer uploads: same pinned connection, no overall time limit (the user can cancel).</summary>
+    private readonly HttpClient _transfer;
+
+    private readonly HttpMessageHandler? _handler;
+
     public ApiClient(Uri serverAddress, X509Certificate2 pinnedCa)
-        : this(new HttpClient(ServerTrust.CreatePinnedHandler(pinnedCa)) { BaseAddress = serverAddress, Timeout = TimeSpan.FromSeconds(20) })
     {
+        _handler = ServerTrust.CreatePinnedHandler(pinnedCa);
+        _http = new HttpClient(_handler, disposeHandler: false) { BaseAddress = serverAddress, Timeout = TimeSpan.FromSeconds(20) };
+        _transfer = new HttpClient(_handler, disposeHandler: false) { BaseAddress = serverAddress, Timeout = Timeout.InfiniteTimeSpan };
     }
 
     /// <summary>For tests and advanced hosting: uses the given client as-is.</summary>
     public ApiClient(HttpClient http)
     {
         _http = http;
+        _transfer = http;
     }
 
     /// <summary>Raised when the server rejects the session (expired, signed out elsewhere, or account disabled).</summary>
@@ -75,7 +83,16 @@ public sealed class ApiClient : IDisposable
         return new ApiClient(address!, X509CertificateLoader.LoadCertificate(ca.RawData));
     }
 
-    public void Dispose() => _http.Dispose();
+    public void Dispose()
+    {
+        _http.Dispose();
+        if (!ReferenceEquals(_transfer, _http))
+        {
+            _transfer.Dispose();
+        }
+
+        _handler?.Dispose();
+    }
 
     // ---------------------------------------------------------------- anonymous
 
@@ -235,6 +252,64 @@ public sealed class ApiClient : IDisposable
     public Task DeletePolicyAsync(Guid id, CancellationToken ct = default) =>
         SendAsync<object>(HttpMethod.Delete, ApiRoutes.PolicyById(id), null, ct);
 
+    // ---------------------------------------------------------------- software
+
+    public Task<SoftwareRequestResponse> CreateSoftwareRequestAsync(CreateSoftwareRequest request, CancellationToken ct = default) =>
+        SendAsync<SoftwareRequestResponse>(HttpMethod.Post, ApiRoutes.SoftwareRequests, request, ct);
+
+    public Task<List<SoftwareRequestResponse>> ListMySoftwareRequestsAsync(CancellationToken ct = default) =>
+        SendAsync<List<SoftwareRequestResponse>>(HttpMethod.Get, ApiRoutes.MySoftwareRequests, null, ct);
+
+    public Task<PagedResult<SoftwareRequestResponse>> ListSoftwareRequestsAsync(int page, int pageSize, string? status, CancellationToken ct = default) =>
+        SendAsync<PagedResult<SoftwareRequestResponse>>(HttpMethod.Get, ApiRoutes.SoftwareRequests + Query(("page", page), ("pageSize", pageSize), ("status", status)), null, ct);
+
+    public Task<SoftwareRequestResponse> ApproveSoftwareRequestAsync(Guid id, ApproveSoftwareRequest request, CancellationToken ct = default) =>
+        SendAsync<SoftwareRequestResponse>(HttpMethod.Post, ApiRoutes.SoftwareRequestApprove(id), request, ct);
+
+    public Task<SoftwareRequestResponse> RejectSoftwareRequestAsync(Guid id, string? note, CancellationToken ct = default) =>
+        SendAsync<SoftwareRequestResponse>(HttpMethod.Post, ApiRoutes.SoftwareRequestReject(id), new RejectSoftwareRequest(note), ct);
+
+    public Task<List<ApprovedSoftwareResponse>> ListApprovedSoftwareAsync(CancellationToken ct = default) =>
+        SendAsync<List<ApprovedSoftwareResponse>>(HttpMethod.Get, ApiRoutes.ApprovedSoftware, null, ct);
+
+    public Task<ApprovedSoftwareResponse> CreateApprovedSoftwareAsync(SaveApprovedSoftwareRequest request, CancellationToken ct = default) =>
+        SendAsync<ApprovedSoftwareResponse>(HttpMethod.Post, ApiRoutes.ApprovedSoftware, request, ct);
+
+    public Task<ApprovedSoftwareResponse> UpdateApprovedSoftwareAsync(Guid id, SaveApprovedSoftwareRequest request, CancellationToken ct = default) =>
+        SendAsync<ApprovedSoftwareResponse>(HttpMethod.Put, ApiRoutes.ApprovedSoftwareById(id), request, ct);
+
+    public Task DeleteApprovedSoftwareAsync(Guid id, CancellationToken ct = default) =>
+        SendAsync<object>(HttpMethod.Delete, ApiRoutes.ApprovedSoftwareById(id), null, ct);
+
+    /// <summary>Uploads an installer file; <paramref name="progress"/> receives the number of bytes sent.</summary>
+    public Task<SoftwarePackageResponse> UploadPackageAsync(Guid approvedSoftwareId, UploadPackageOptions options, Stream content, IProgress<long>? progress = null, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        var route = ApiRoutes.ApprovedSoftwarePackages(approvedSoftwareId) + Query(("fileName", options.FileName), ("installerType", options.InstallerType),
+            ("silentArguments", options.SilentArguments), ("signerSubject", options.SignerSubject), ("allowUnsigned", options.AllowUnsigned ? "true" : "false"));
+        var body = new StreamContent(progress is null ? content : new ProgressStream(content, progress), 81920);
+        body.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
+        return SendContentAsync<SoftwarePackageResponse>(_transfer, HttpMethod.Post, route, body, ct);
+    }
+
+    public Task DeletePackageAsync(Guid id, CancellationToken ct = default) =>
+        SendAsync<object>(HttpMethod.Delete, ApiRoutes.SoftwarePackageById(id), null, ct);
+
+    public Task<PagedResult<DeploymentResponse>> ListDeploymentsAsync(int page, int pageSize, Guid? computerId, string? status, CancellationToken ct = default) =>
+        SendAsync<PagedResult<DeploymentResponse>>(HttpMethod.Get, ApiRoutes.SoftwareDeployments + Query(("page", page), ("pageSize", pageSize), ("computerId", computerId), ("status", status)), null, ct);
+
+    public Task<List<DeploymentResponse>> CreateDeploymentsAsync(CreateDeploymentRequest request, CancellationToken ct = default) =>
+        SendAsync<List<DeploymentResponse>>(HttpMethod.Post, ApiRoutes.SoftwareDeployments, request, ct);
+
+    public Task CancelDeploymentAsync(Guid id, CancellationToken ct = default) =>
+        SendAsync<object>(HttpMethod.Post, ApiRoutes.DeploymentCancel(id), null, ct);
+
+    public Task<List<SoftwareTitleSummary>> ListSoftwareTitlesAsync(string? search, bool unapprovedOnly, CancellationToken ct = default) =>
+        SendAsync<List<SoftwareTitleSummary>>(HttpMethod.Get, ApiRoutes.SoftwareInventory + Query(("search", search), ("unapprovedOnly", unapprovedOnly ? "true" : null)), null, ct);
+
+    public Task<List<InstalledSoftwareResponse>> ListInstalledSoftwareAsync(Guid? computerId, string? name, CancellationToken ct = default) =>
+        SendAsync<List<InstalledSoftwareResponse>>(HttpMethod.Get, ApiRoutes.SoftwareInventoryComputers + Query(("computerId", computerId), ("name", name)), null, ct);
+
     // ---------------------------------------------------------------- plumbing
 
     private CurrentUserResponse StartSession(SessionResponse session)
@@ -244,13 +319,12 @@ public sealed class ApiClient : IDisposable
         return session.User;
     }
 
-    private async Task<T> SendAsync<T>(HttpMethod method, string route, object? body, CancellationToken ct)
+    private Task<T> SendAsync<T>(HttpMethod method, string route, object? body, CancellationToken ct) =>
+        SendContentAsync<T>(_http, method, route, body is null ? null : JsonContent.Create(body, body.GetType()), ct);
+
+    private async Task<T> SendContentAsync<T>(HttpClient http, HttpMethod method, string route, HttpContent? content, CancellationToken ct)
     {
-        using var request = new HttpRequestMessage(method, new Uri(route, UriKind.Relative));
-        if (body is not null)
-        {
-            request.Content = JsonContent.Create(body, body.GetType());
-        }
+        using var request = new HttpRequestMessage(method, new Uri(route, UriKind.Relative)) { Content = content };
 
         var authenticated = Token is not null;
         if (authenticated)
@@ -261,7 +335,7 @@ public sealed class ApiClient : IDisposable
         HttpResponseMessage response;
         try
         {
-            response = await _http.SendAsync(request, ct).ConfigureAwait(false);
+            response = await http.SendAsync(request, ct).ConfigureAwait(false);
         }
         catch (HttpRequestException ex)
         {
@@ -330,5 +404,50 @@ public sealed class ApiClient : IDisposable
             .Select(p => $"{p.Name}={Uri.EscapeDataString(Convert.ToString(p.Value, CultureInfo.InvariantCulture)!)}");
         var query = string.Join('&', parts);
         return query.Length == 0 ? string.Empty : "?" + query;
+    }
+}
+
+/// <summary>Reports how much of a stream has been read (upload progress).</summary>
+internal sealed class ProgressStream(Stream inner, IProgress<long> progress) : Stream
+{
+    private long _position;
+
+    public override bool CanRead => true;
+
+    public override bool CanSeek => false;
+
+    public override bool CanWrite => false;
+
+    public override long Length => inner.Length;
+
+    public override long Position
+    {
+        get => _position;
+        set => throw new NotSupportedException();
+    }
+
+    public override int Read(byte[] buffer, int offset, int count) => Count(inner.Read(buffer, offset, count));
+
+    public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default) =>
+        Count(await inner.ReadAsync(buffer, cancellationToken).ConfigureAwait(false));
+
+    public override Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken) =>
+        ReadAsync(buffer.AsMemory(offset, count), cancellationToken).AsTask();
+
+    public override void Flush()
+    {
+    }
+
+    public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+
+    public override void SetLength(long value) => throw new NotSupportedException();
+
+    public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+
+    private int Count(int read)
+    {
+        _position += read;
+        progress.Report(_position);
+        return read;
     }
 }
