@@ -40,6 +40,8 @@ public sealed class ServerDbContext(DbContextOptions<ServerDbContext> options) :
 
     public DbSet<ControlExemption> Exemptions => Set<ControlExemption>();
 
+    public DbSet<BitLockerRecoveryKey> RecoveryKeys => Set<BitLockerRecoveryKey>();
+
     protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
     {
         ArgumentNullException.ThrowIfNull(configurationBuilder);
@@ -164,6 +166,7 @@ public sealed class ServerDbContext(DbContextOptions<ServerDbContext> options) :
             e.Property(d => d.Name).HasMaxLength(256).IsRequired();
             e.Property(d => d.DeviceClass).HasMaxLength(64).IsRequired();
             e.Property(d => d.Manufacturer).HasMaxLength(256);
+            e.Property(d => d.ParentInstanceId).HasMaxLength(400);
             e.HasIndex(d => new { d.ComputerId, d.InstanceId }).IsUnique();
             e.HasOne<Computer>().WithMany().HasForeignKey(d => d.ComputerId).OnDelete(DeleteBehavior.Cascade);
         });
@@ -257,6 +260,17 @@ public sealed class ServerDbContext(DbContextOptions<ServerDbContext> options) :
             e.Property(x => x.Control).HasMaxLength(64);
             e.Property(x => x.Reason).HasMaxLength(500);
             e.HasIndex(x => new { x.ComputerId, x.ExpiresAtUtc });
+            e.HasOne<Computer>().WithMany().HasForeignKey(x => x.ComputerId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<BitLockerRecoveryKey>(e =>
+        {
+            e.ToTable("bitlocker_recovery_keys");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).ValueGeneratedOnAdd();
+            e.Property(x => x.Drive).HasMaxLength(8);
+            e.Property(x => x.ProtectorId).HasMaxLength(64);
+            e.HasIndex(x => new { x.ComputerId, x.ProtectorId }).IsUnique();
             e.HasOne<Computer>().WithMany().HasForeignKey(x => x.ComputerId).OnDelete(DeleteBehavior.Cascade);
         });
 

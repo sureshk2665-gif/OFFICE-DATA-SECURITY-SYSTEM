@@ -41,6 +41,8 @@ public static class RemovableStoragePolicy
 public sealed class RemovableStorageEnforcer(RegistryPolicyEngine engine, IEnforcementEvents events, TimeProvider clock)
     : RegistryPolicyEnforcer(engine, events, clock)
 {
+    private readonly TimeProvider _clock = clock;
+
     public override SecurityControl Control => SecurityControl.RemovableStorage;
 
     protected override string Description => "USB drive blocking";
@@ -53,7 +55,13 @@ public sealed class RemovableStorageEnforcer(RegistryPolicyEngine engine, IEnfor
             case EnforcementMode.Audit:
                 return new RegistryPlan(ControlState.AuditOnly, "Audit mode: USB drives are allowed; every connection is recorded.", []);
             case EnforcementMode.Enforce:
-                var values = RemovableStoragePolicy.Deny(RemovableStoragePolicy.RemovableDisks, execute: true)
+                // With approved devices, USB drives are controlled per device by the device installation policy
+                // (ApprovedDevicesEnforcer); running programs from any USB drive stays denied.
+                var perDevice = ApprovedDevicesEnforcer.Active(policy, _clock.GetUtcNow()).Count > 0;
+                var disks = perDevice
+                    ? [new PolicyValue($@"{RemovableStoragePolicy.Root}\{RemovableStoragePolicy.RemovableDisks}", "Deny_Execute", 1)]
+                    : RemovableStoragePolicy.Deny(RemovableStoragePolicy.RemovableDisks, execute: true);
+                var values = disks
                     .Concat(RemovableStoragePolicy.Deny(RemovableStoragePolicy.FloppyDrives))
                     .Concat(RemovableStoragePolicy.Deny(RemovableStoragePolicy.TapeDrives));
                 if (settings.BlockOpticalDrives)
@@ -62,8 +70,10 @@ public sealed class RemovableStorageEnforcer(RegistryPolicyEngine engine, IEnfor
                 }
 
                 return new RegistryPlan(ControlState.Enforced,
-                    "Reading, writing and running programs from USB drives and memory cards" + (settings.BlockOpticalDrives ? ", and CD/DVD access," : string.Empty)
-                    + " are denied for all users (Windows Removable Storage Access policy). A drive that was already connected must be reconnected.",
+                    perDevice
+                        ? "Only approved USB drives can be used (see 'Approved USB devices'); running programs from USB drives" + (settings.BlockOpticalDrives ? " and CD/DVD access" : string.Empty) + " are denied for all users."
+                        : "Reading, writing and running programs from USB drives and memory cards" + (settings.BlockOpticalDrives ? ", and CD/DVD access," : string.Empty)
+                          + " are denied for all users (Windows Removable Storage Access policy). A drive that was already connected must be reconnected.",
                     values.ToList());
             default:
                 return RegistryPlan.NotConfigured();

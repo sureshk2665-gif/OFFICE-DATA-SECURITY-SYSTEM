@@ -11,7 +11,7 @@ namespace OfficeSecurity.Agent.Enforcement;
 public sealed record AppControlPolicyState(bool IsActive, string? Version);
 
 /// <summary>The App Control policy to build: Microsoft's "Allow Microsoft" base plus folder rules.</summary>
-public sealed record AppControlBuild(bool AuditOnly, IReadOnlyList<string> AllowedFolders, string Version);
+public sealed record AppControlBuild(bool AuditOnly, IReadOnlyList<string> AllowedFolders, string Version, IReadOnlyList<string>? DeniedFiles = null);
 
 /// <summary>Windows App Control for Business (WDAC): build, activate, query and remove a policy.</summary>
 public interface IAppControlPlatform
@@ -71,7 +71,8 @@ public sealed class AppControlEnforcer(IAppControlPlatform platform, string stat
         }
 
         var folders = Folders(settings);
-        var hash = Hash(settings.Mode, folders);
+        var denied = Denied(policy);
+        var hash = Hash(settings.Mode, [.. folders, .. denied.Select(d => "deny:" + d)]);
         var policyId = state.PolicyId ?? Guid.NewGuid();
         var current = platform.Query(policyId);
         var inPlace = current is { IsActive: true } && state.DeployedHash == hash && SameVersion(current.Version, state.Version);
@@ -86,7 +87,7 @@ public sealed class AppControlEnforcer(IAppControlPlatform platform, string stat
             var next = state.Revision + 1;
             var version = string.Create(CultureInfo.InvariantCulture, $"10.0.{next / 60000}.{next % 60000}");
             SaveState(state with { PolicyId = policyId, Revision = next, Version = version, DeployedHash = null });
-            platform.Deploy(policyId, new AppControlBuild(settings.Mode == EnforcementMode.Audit, folders, version));
+            platform.Deploy(policyId, new AppControlBuild(settings.Mode == EnforcementMode.Audit, folders, version, denied));
             state = state with { PolicyId = policyId, Revision = next, Version = version, DeployedHash = hash };
             SaveState(state);
             current = platform.Query(policyId);
@@ -147,10 +148,14 @@ public sealed class AppControlEnforcer(IAppControlPlatform platform, string stat
             : Status(ControlState.Enforced, $"Other programs (for example from Downloads, the Desktop, AppData or a USB drive) are blocked by Windows App Control. {allowed} Scripts are not restricted.");
     }
 
+    /// <summary>Programs always blocked, even though Microsoft signs them (e.g. Bluetooth file transfer).</summary>
+    private static List<string> Denied(SecurityPolicyDocument policy) =>
+        policy.Bluetooth.Mode == BluetoothMode.BlockFileTransfer ? [BluetoothEnforcer.FileTransferProgram] : [];
+
     private static List<string> Folders(ApplicationControlSettings settings) =>
         [.. AdministratorFolders, .. settings.AllowedFolders.Select(f => f.Trim()).Distinct(StringComparer.OrdinalIgnoreCase).Order(StringComparer.OrdinalIgnoreCase)];
 
-    private static string Hash(EnforcementMode mode, IReadOnlyList<string> folders) =>
+    private static string Hash(EnforcementMode mode, List<string> folders) =>
         Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(mode + "|" + string.Join("|", folders).ToUpperInvariant())));
 
     private static bool SameVersion(string? a, string? b) =>

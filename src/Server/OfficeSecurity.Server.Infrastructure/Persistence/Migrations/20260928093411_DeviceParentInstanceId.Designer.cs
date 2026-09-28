@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using OfficeSecurity.Server.Infrastructure.Persistence;
 
@@ -10,9 +11,11 @@ using OfficeSecurity.Server.Infrastructure.Persistence;
 namespace OfficeSecurity.Server.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(ServerDbContext))]
-    partial class ServerDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260928093411_DeviceParentInstanceId")]
+    partial class DeviceParentInstanceId
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.12");
@@ -225,43 +228,6 @@ namespace OfficeSecurity.Server.Infrastructure.Persistence.Migrations
                     b.HasIndex("OccurredAtUtc");
 
                     b.ToTable("audit_log", (string)null);
-                });
-
-            modelBuilder.Entity("OfficeSecurity.Server.Domain.BitLockerRecoveryKey", b =>
-                {
-                    b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("INTEGER");
-
-                    b.Property<Guid>("ComputerId")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Drive")
-                        .IsRequired()
-                        .HasMaxLength(8)
-                        .HasColumnType("TEXT");
-
-                    b.Property<long>("FirstReportedUtc")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<long>("LastReportedUtc")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<byte[]>("ProtectedPassword")
-                        .IsRequired()
-                        .HasColumnType("BLOB");
-
-                    b.Property<string>("ProtectorId")
-                        .IsRequired()
-                        .HasMaxLength(64)
-                        .HasColumnType("TEXT");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ComputerId", "ProtectorId")
-                        .IsUnique();
-
-                    b.ToTable("bitlocker_recovery_keys", (string)null);
                 });
 
             modelBuilder.Entity("OfficeSecurity.Server.Domain.Computer", b =>
@@ -911,15 +877,6 @@ namespace OfficeSecurity.Server.Infrastructure.Persistence.Migrations
                     b.HasIndex("ComputerId");
 
                     b.ToTable("staff_computer_assignments", (string)null);
-                });
-
-            modelBuilder.Entity("OfficeSecurity.Server.Domain.BitLockerRecoveryKey", b =>
-                {
-                    b.HasOne("OfficeSecurity.Server.Domain.Computer", null)
-                        .WithMany()
-                        .HasForeignKey("ComputerId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
                 });
 
             modelBuilder.Entity("OfficeSecurity.Server.Domain.Computer", b =>

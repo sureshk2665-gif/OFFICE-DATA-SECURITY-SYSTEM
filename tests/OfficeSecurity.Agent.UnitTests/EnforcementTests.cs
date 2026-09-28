@@ -332,13 +332,14 @@ public sealed class SecurityControlTests
     }
 
     [Fact]
-    public async Task Wifi_restriction_alone_is_reported_as_not_implemented()
+    public async Task Wifi_restriction_without_wifi_support_is_reported_as_not_in_effect()
     {
         var enforcer = new FirewallEnforcer(new InMemoryFirewall(), _store, _events, _clock);
 
         var status = await enforcer.ApplyAsync(Policy(s => s with { Network = new() { AllowedWifiNetworks = ["Office"] } }), default);
 
-        Assert.Equal(ControlState.NotImplemented, status.State);
+        Assert.Equal(ControlState.Failed, status.State);
+        Assert.Contains("Not in effect", status.Details, StringComparison.Ordinal);
     }
 
     [Fact]

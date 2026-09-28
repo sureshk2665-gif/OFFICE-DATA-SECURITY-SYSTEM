@@ -80,7 +80,7 @@ public sealed class ComputerAdministration(
         var devices = await db.Devices.AsNoTracking().Where(d => d.ComputerId == id)
             .OrderByDescending(d => d.IsConnected).ThenByDescending(d => d.LastSeenUtc)
             .Take(200)
-            .Select(d => new DeviceSummary(d.InstanceId, d.Name, d.DeviceClass, d.Manufacturer, d.IsConnected, d.FirstSeenUtc, d.LastSeenUtc))
+            .Select(d => new DeviceSummary(d.InstanceId, d.Name, d.DeviceClass, d.Manufacturer, d.IsConnected, d.FirstSeenUtc, d.LastSeenUtc, d.ParentInstanceId))
             .ToListAsync(cancellationToken).ConfigureAwait(false);
         var staff = await (from a in db.StaffAssignments.AsNoTracking()
                            join s in db.Staff.AsNoTracking() on a.StaffId equals s.Id

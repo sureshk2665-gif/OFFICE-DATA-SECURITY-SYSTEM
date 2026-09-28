@@ -76,6 +76,7 @@ builder.Services.AddScoped<AuthService>();
 builder.Services.AddScoped<AccountAdministration>();
 builder.Services.AddScoped<PolicyService>();
 builder.Services.AddScoped<ExemptionService>();
+builder.Services.AddScoped<RecoveryKeyService>();
 builder.Services.AddScoped<ComputerAdministration>();
 builder.Services.AddScoped<AgentService>();
 builder.Services.AddScoped<SoftwareService>();

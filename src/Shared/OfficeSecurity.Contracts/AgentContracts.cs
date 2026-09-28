@@ -39,7 +39,8 @@ public sealed record AgentEnrollStatusResponse(string Status, string? Certificat
 
 // ---------------------------------------------------------------- enrolled agent (mutual TLS)
 
-public sealed record ConnectedDevice(string InstanceId, string Name, string DeviceClass, string? Manufacturer);
+/// <param name="ParentInstanceId">For USB storage: the USB device it belongs to (what Windows blocks or allows).</param>
+public sealed record ConnectedDevice(string InstanceId, string Name, string DeviceClass, string? Manufacturer, string? ParentInstanceId = null);
 
 public sealed record AgentHeartbeatRequest(string AgentVersion, long AppliedPolicyVersion, IReadOnlyList<ControlStatus> Controls, int QueuedEvents);
 
@@ -47,7 +48,11 @@ public sealed record AgentHeartbeatRequest(string AgentVersion, long AppliedPoli
 public sealed record AgentHeartbeatResponse(long LatestPolicyVersion, int HeartbeatIntervalSeconds, int PendingJobs = 0);
 
 /// <param name="Software">Installed programs; null when the agent did not collect them in this report.</param>
-public sealed record AgentInventoryRequest(HardwareInventory Hardware, IReadOnlyList<ConnectedDevice> Devices, IReadOnlyList<InstalledSoftware>? Software = null);
+public sealed record AgentInventoryRequest(HardwareInventory Hardware, IReadOnlyList<ConnectedDevice> Devices, IReadOnlyList<InstalledSoftware>? Software = null,
+    IReadOnlyList<RecoveryKeyReport>? RecoveryKeys = null);
+
+/// <summary>A BitLocker recovery password of one of the computer's drives (sent only over mutual TLS, stored encrypted).</summary>
+public sealed record RecoveryKeyReport(string Drive, string ProtectorId, string RecoveryPassword);
 
 /// <param name="Scope">"Machine" (all users) or "User" (installed for one user only).</param>
 public sealed record InstalledSoftware(string Name, string? Version, string? Publisher, DateOnly? InstallDate, string Scope);

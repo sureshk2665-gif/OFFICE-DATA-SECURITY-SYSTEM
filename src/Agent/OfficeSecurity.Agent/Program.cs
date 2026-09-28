@@ -19,6 +19,7 @@ return command switch
     "uninstall" => Commands.Uninstall(),
     "status" => await Commands.StatusAsync(),
     "inventory" => Commands.Inventory(),
+    "check" => Commands.Check(),
     null or "help" or "--help" or "-h" or "/?" => Commands.Help(),
     _ => Commands.Help(args[0]),
 };
@@ -51,7 +52,14 @@ static void RunAgent(string[] args)
     builder.Services.AddSingleton<IEnforcer, SoftwareInstallationEnforcer>();
     builder.Services.AddSingleton<IEnforcer, BrowserEnforcer>();
     builder.Services.AddSingleton<IEnforcer>(sp => new FirewallEnforcer(new WindowsFirewall(),
-        new FileManagedSettingsStore(paths.DataDirectory, FileManagedSettingsStore.FirewallFile), sp.GetRequiredService<IEnforcementEvents>(), sp.GetRequiredService<TimeProvider>()));
+        new FileManagedSettingsStore(paths.DataDirectory, FileManagedSettingsStore.FirewallFile), sp.GetRequiredService<IEnforcementEvents>(), sp.GetRequiredService<TimeProvider>(),
+        new WifiRestriction(new WindowsWifi(), new FileManagedSettingsStore(paths.DataDirectory, FileManagedSettingsStore.WifiFile), sp.GetRequiredService<IEnforcementEvents>())));
+
+    // Phase 5 part 3: approved USB drives, Bluetooth.
+    builder.Services.AddSingleton<IEnforcer>(sp => new ApprovedDevicesEnforcer(sp.GetRequiredService<RegistryPolicyEngine>(), new WindowsUsbStorageDevices(),
+        sp.GetRequiredService<IEnforcementEvents>(), sp.GetRequiredService<TimeProvider>()));
+    builder.Services.AddSingleton<IEnforcer>(sp => new BluetoothEnforcer(new WindowsBluetooth(), new FileManagedSettingsStore(paths.DataDirectory, FileManagedSettingsStore.BluetoothFile),
+        sp.GetRequiredService<IEnforcementEvents>(), sp.GetRequiredService<TimeProvider>()));
     builder.Services.AddSingleton<IEnforcer>(sp => new ServiceProtectionEnforcer(sp.GetRequiredService<IEnforcementEvents>(), sp.GetRequiredService<TimeProvider>()));
 
     // Phase 5 part 2: Application Control, Windows sign-in and file access records, ransomware protection, disk encryption.

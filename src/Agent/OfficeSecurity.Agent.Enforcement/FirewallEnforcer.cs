@@ -37,8 +37,10 @@ public interface IFirewall
 /// Blocks network access for named programs with Windows Defender Firewall outbound rules. The firewall itself
 /// is never switched on or off by this system; if it is off, the control reports that the rules have no effect.
 /// </summary>
-public sealed class FirewallEnforcer(IFirewall firewall, IManagedSettingsStore store, IEnforcementEvents events, TimeProvider clock) : IEnforcer
+public sealed class FirewallEnforcer(IFirewall firewall, IManagedSettingsStore store, IEnforcementEvents events, TimeProvider clock, WifiRestriction? wifi = null) : IEnforcer
 {
+    private (bool InForce, string Detail)? _wifi;
+
     public const string RuleGroup = "Office Security System";
     private const string StoreKey = "WindowsFirewall";
 
@@ -86,6 +88,7 @@ public sealed class FirewallEnforcer(IFirewall firewall, IManagedSettingsStore s
         }
 
         store.Save(Control, desired);
+        _wifi = wifi?.Apply(policy.Network.AllowedWifiNetworks, lifted: exemption is not null);
         if (restored.Count > 0)
         {
             events.Raise(SecurityEventType.PolicyTamperAttempt, EventSeverities.Critical,
@@ -145,8 +148,8 @@ public sealed class FirewallEnforcer(IFirewall firewall, IManagedSettingsStore s
                 string.Create(CultureInfo.InvariantCulture, $"Temporarily allowed by an administrator until {exemption.ExpiresAtUtc:yyyy-MM-dd HH:mm} UTC: {exemption.Reason}"), now);
         }
 
-        var wifi = policy.Network.AllowedWifiNetworks.Count > 0;
-        if (desired.Count == 0 && !wifi)
+        var wantsWifi = policy.Network.AllowedWifiNetworks.Count > 0;
+        if (desired.Count == 0 && !wantsWifi)
         {
             return new ControlStatus(Control, ControlState.NotConfigured, "Not required by the policy.", now);
         }
@@ -158,15 +161,32 @@ public sealed class FirewallEnforcer(IFirewall firewall, IManagedSettingsStore s
             gaps.Add($"Windows Firewall is turned off for the {off.ToString().Replace(", ", " and ", StringComparison.Ordinal)} network profile(s), so the rules have no effect there");
         }
 
-        if (wifi)
+        var done = desired.Count == 0 ? string.Empty : string.Create(CultureInfo.InvariantCulture, $"{desired.Count} program(s) blocked from the network by Windows Firewall (a copy in another folder is not blocked). ");
+        var wifiInForce = false;
+        if (wantsWifi)
         {
-            gaps.Add("restricting Wi-Fi networks is not available yet");
+            if (wifi is null)
+            {
+                gaps.Add("restricting Wi-Fi networks is not available in this agent");
+            }
+            else if (_wifi is { } w)
+            {
+                if (w.InForce)
+                {
+                    done += w.Detail + " ";
+                    wifiInForce = true;
+                }
+                else
+                {
+                    gaps.Add(w.Detail.TrimEnd('.'));
+                }
+            }
         }
 
-        var done = desired.Count == 0 ? string.Empty : string.Create(CultureInfo.InvariantCulture, $"{desired.Count} program(s) blocked from the network by Windows Firewall. ");
+        var anythingInForce = desired.Count > 0 || wifiInForce;
         return gaps.Count == 0
-            ? new ControlStatus(Control, ControlState.Enforced, done + "A copy of a program in another folder is not blocked; Application Control covers that.", now)
-            : new ControlStatus(Control, desired.Count > 0 ? ControlState.PartiallyEnforced : ControlState.NotImplemented, done + "Not in effect: " + string.Join("; ", gaps) + ".", now);
+            ? new ControlStatus(Control, ControlState.Enforced, done.Trim(), now)
+            : new ControlStatus(Control, anythingInForce ? ControlState.PartiallyEnforced : ControlState.Failed, done + "Not in effect: " + string.Join("; ", gaps) + ".", now);
     }
 
     private static List<PolicyValue> Desired(SecurityPolicyDocument policy) =>

@@ -12,6 +12,9 @@ public interface IInventoryCollector
 
     /// <summary>Installed programs (as listed in Windows "Installed apps").</summary>
     IReadOnlyList<InstalledSoftware> CollectSoftware();
+
+    /// <summary>BitLocker recovery passwords of this computer's drives (only read when the policy requires BitLocker).</summary>
+    IReadOnlyList<RecoveryKeyReport> CollectRecoveryKeys() => [];
 }
 
 /// <summary>Minimal portable inventory (development and tests on non-Windows systems).</summary>

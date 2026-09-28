@@ -26,7 +26,7 @@ public sealed record ComputerSummary(
     int FailedControls,
     DateTimeOffset RegisteredAtUtc);
 
-public sealed record DeviceSummary(string InstanceId, string Name, string DeviceClass, string? Manufacturer, bool IsConnected, DateTimeOffset FirstSeenUtc, DateTimeOffset LastSeenUtc);
+public sealed record DeviceSummary(string InstanceId, string Name, string DeviceClass, string? Manufacturer, bool IsConnected, DateTimeOffset FirstSeenUtc, DateTimeOffset LastSeenUtc, string? ParentInstanceId = null);
 
 public sealed record StaffReference(Guid Id, string EmployeeCode, string DisplayName);
 
@@ -86,3 +86,8 @@ public static class Exemptions
         SecurityControl.BrowserRestrictions,
     ];
 }
+
+/// <summary>A BitLocker recovery key on file (the key itself is only shown by <see cref="RecoveryKeyRevealResponse"/>).</summary>
+public sealed record RecoveryKeyResponse(long Id, string Drive, string ProtectorId, DateTimeOffset FirstReportedUtc, DateTimeOffset LastReportedUtc);
+
+public sealed record RecoveryKeyRevealResponse(long Id, string Drive, string RecoveryPassword);

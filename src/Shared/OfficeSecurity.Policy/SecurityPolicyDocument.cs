@@ -65,8 +65,14 @@ public sealed record RemovableStorageSettings
     public IReadOnlyList<ApprovedDevice> ApprovedDevices { get; init; } = [];
 }
 
-/// <summary>A removable device approved by an administrator, identified by its Windows device instance ID.</summary>
-public sealed record ApprovedDevice(string DeviceInstanceId, string Description, DateTimeOffset? ExpiresAtUtc);
+/// <summary>
+/// A USB storage device approved by an administrator, identified by its Windows device instance ID (the disk) and
+/// the instance ID of the USB device it belongs to (what Windows' device installation policy matches).
+/// </summary>
+public sealed record ApprovedDevice(string DeviceInstanceId, string Description, DateTimeOffset? ExpiresAtUtc, string? ParentInstanceId = null)
+{
+    public bool IsActiveAt(DateTimeOffset nowUtc) => ExpiresAtUtc is null || ExpiresAtUtc > nowUtc;
+}
 
 public enum BluetoothMode
 {

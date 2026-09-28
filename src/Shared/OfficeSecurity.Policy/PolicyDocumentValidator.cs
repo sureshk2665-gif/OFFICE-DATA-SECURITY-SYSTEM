@@ -34,6 +34,14 @@ public static class PolicyDocumentValidator
             {
                 errors.Add("Approved device must have a device instance ID.");
             }
+
+            foreach (var id in new[] { device.DeviceInstanceId, device.ParentInstanceId })
+            {
+                if (id is not null && (id.Length > 400 || id.Any(char.IsControl) || id.Contains('"', StringComparison.Ordinal)))
+                {
+                    errors.Add($"Approved device ID '{id}' is not valid.");
+                }
+            }
         }
 
         foreach (var hash in document.ApplicationControl.AllowedFileHashes)

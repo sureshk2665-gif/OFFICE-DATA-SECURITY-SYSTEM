@@ -44,6 +44,8 @@ internal sealed class WindowsInventoryCollector : IInventoryCollector
             partOfDomain == true ? system?.GetValueOrDefault("Domain") as string : system?.GetValueOrDefault("Workgroup") as string);
     }
 
+    public IReadOnlyList<RecoveryKeyReport> CollectRecoveryKeys() => WindowsRecoveryKeys.Read();
+
     public IReadOnlyList<ConnectedDevice> CollectDevices()
     {
         using var searcher = new ManagementObjectSearcher(DeviceQuery);
@@ -55,7 +57,10 @@ internal sealed class WindowsInventoryCollector : IInventoryCollector
             {
                 if (item["PNPDeviceID"] is string id)
                 {
-                    devices.Add(new ConnectedDevice(id, item["Name"] as string ?? id, item["PNPClass"] as string ?? "Unknown", item["Manufacturer"] as string));
+                    var deviceClass = item["PNPClass"] as string ?? "Unknown";
+                    // For USB storage, the parent USB device is what an approval has to name (see ApprovedDevicesEnforcer).
+                    var parent = deviceClass == "DiskDrive" ? DeviceList.Parent(id) : null;
+                    devices.Add(new ConnectedDevice(id, item["Name"] as string ?? id, deviceClass, item["Manufacturer"] as string, parent));
                 }
             }
         }

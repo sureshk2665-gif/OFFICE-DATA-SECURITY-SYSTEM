@@ -108,7 +108,7 @@ public sealed class FakeAgentServer : HttpMessageHandler
             ApiRoutes.AgentHeartbeat => new AgentHeartbeatResponse(LatestVersion, 60),
             ApiRoutes.AgentPolicy => Policy(),
             ApiRoutes.AgentEvents => await RecordEventsAsync(request, cancellationToken),
-            ApiRoutes.AgentInventory => CountInventory(),
+            ApiRoutes.AgentInventory => await CountInventoryAsync(request, cancellationToken),
             ApiRoutes.AgentLoginTicket => new ComputerLoginTicketResponse("ticket-123", DateTimeOffset.UtcNow.AddMinutes(2)),
             _ => throw new InvalidOperationException("Unexpected request " + path),
         };
@@ -131,9 +131,12 @@ public sealed class FakeAgentServer : HttpMessageHandler
         return PolicyOverride?.Invoke() ?? Sign(LatestVersion);
     }
 
-    private object? CountInventory()
+    public List<AgentInventoryRequest> InventoryRequests { get; } = [];
+
+    private async Task<object?> CountInventoryAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {
         InventoryReports++;
+        InventoryRequests.Add((await request.Content!.ReadFromJsonAsync<AgentInventoryRequest>(Json, cancellationToken))!);
         return null;
     }
 
@@ -156,6 +159,10 @@ public sealed class FakeInventory : IInventoryCollector
     public List<InstalledSoftware> Software { get; } = [];
 
     public IReadOnlyList<InstalledSoftware> CollectSoftware() => [.. Software];
+
+    public List<RecoveryKeyReport> RecoveryKeys { get; } = [];
+
+    public IReadOnlyList<RecoveryKeyReport> CollectRecoveryKeys() => [.. RecoveryKeys];
 }
 
 /// <summary>An agent runtime wired to a fake server, with its own data folder and clock.</summary>

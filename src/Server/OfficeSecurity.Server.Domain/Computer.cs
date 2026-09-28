@@ -92,6 +92,9 @@ public sealed class DeviceInventoryItem
 
     public string? Manufacturer { get; set; }
 
+    /// <summary>For USB storage: the parent USB device instance ID.</summary>
+    public string? ParentInstanceId { get; set; }
+
     public bool IsConnected { get; set; }
 
     public DateTimeOffset FirstSeenUtc { get; set; }
@@ -178,4 +181,22 @@ public sealed class ControlExemption
     public DateTimeOffset? RevokedAtUtc { get; set; }
 
     public Guid? RevokedByAdminId { get; set; }
+}
+
+/// <summary>A BitLocker recovery password reported by a computer, stored encrypted (ISecretProtector).</summary>
+public sealed class BitLockerRecoveryKey
+{
+    public long Id { get; set; }
+
+    public Guid ComputerId { get; set; }
+
+    public required string Drive { get; set; }
+
+    public required string ProtectorId { get; set; }
+
+    public required byte[] ProtectedPassword { get; set; }
+
+    public DateTimeOffset FirstReportedUtc { get; set; }
+
+    public DateTimeOffset LastReportedUtc { get; set; }
 }

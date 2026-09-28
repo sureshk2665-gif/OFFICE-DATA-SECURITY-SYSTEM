@@ -32,6 +32,7 @@ internal static class Commands
             Other commands:
               status      show whether this computer is registered and approved
               inventory   show the computer and device information the agent reports
+              check       test the protections on this computer now (administrator; plug in a USB drive first)
               uninstall   remove the agent from this computer (administrator)
               run         run the agent in this window instead of as a service (troubleshooting, administrator)
             """);
@@ -121,6 +122,18 @@ internal static class Commands
         return 6;
     }
 
+    public static int Check()
+    {
+        if (!IsAdministrator())
+        {
+            Console.Error.WriteLine("Administrator rights are required for the self-check.");
+            return 5;
+        }
+
+        Console.OutputEncoding = System.Text.Encoding.UTF8;
+        return SelfCheck.Run();
+    }
+
     public static int Uninstall()
     {
         if (!IsAdministrator())
@@ -140,6 +153,8 @@ internal static class Commands
         var auditStore = new FileManagedSettingsStore(paths.DataDirectory, FileManagedSettingsStore.AuditFile);
         var folders = FileAccessAuditEnforcer.RemoveAll(new WindowsFolderAudit(), auditStore);
         var audit = new AuditPolicyEngine(new WindowsAuditPolicy(), auditStore).RemoveAll();
+        new WifiRestriction(new WindowsWifi(), new FileManagedSettingsStore(paths.DataDirectory, FileManagedSettingsStore.WifiFile), NoEnforcementEvents.Instance).Undo();
+        BluetoothEnforcer.RemoveAll(new WindowsBluetooth(), new FileManagedSettingsStore(paths.DataDirectory, FileManagedSettingsStore.BluetoothFile));
         var appControl = AppControlEnforcer.RemoveAll(new WindowsAppControl(Path.Combine(paths.DataDirectory, "appcontrol")), paths.DataDirectory);
         Console.WriteLine($"Removed the protections set by the agent ({settings} Windows setting(s), {rules} firewall rule(s), {audit} audit setting(s), " +
             $"{folders} folder audit entr(ies){(appControl ? ", the Application Control policy" : string.Empty)}).");

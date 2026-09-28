@@ -61,6 +61,8 @@ public sealed partial class AgentRuntime : IDisposable
     private Dictionary<string, ConnectedDevice>? _lastDevices;
     private DateTimeOffset _nextHeartbeat;
     private DateTimeOffset _nextEnforcement;
+    private string? _sentKeyFingerprint;
+    private string? _pendingKeyFingerprint;
     private DateTimeOffset _nextInventory;
     private DateTimeOffset _pendingSince;
     private long _rejectedPolicyVersion;
@@ -330,7 +332,8 @@ public sealed partial class AgentRuntime : IDisposable
 
         if (now >= _nextInventory)
         {
-            await client.SendInventoryAsync(new AgentInventoryRequest(_inventory.CollectHardware(), devices, _inventory.CollectSoftware()), cancellationToken).ConfigureAwait(false);
+            await client.SendInventoryAsync(new AgentInventoryRequest(_inventory.CollectHardware(), devices, _inventory.CollectSoftware(), RecoveryKeysToSend()), cancellationToken).ConfigureAwait(false);
+            _sentKeyFingerprint = _pendingKeyFingerprint;
             _nextInventory = now + _options.InventoryInterval;
         }
 
@@ -418,6 +421,21 @@ public sealed partial class AgentRuntime : IDisposable
         }
     }
 
+    /// <summary>BitLocker recovery keys, sent only when the policy asks for BitLocker and they changed since the last report.</summary>
+    private List<RecoveryKeyReport>? RecoveryKeysToSend()
+    {
+        _pendingKeyFingerprint = _sentKeyFingerprint;
+        if (!CurrentPolicy.DiskEncryption.RequireBitLocker)
+        {
+            return null;
+        }
+
+        var keys = _inventory.CollectRecoveryKeys().OrderBy(k => k.Drive, StringComparer.OrdinalIgnoreCase).ThenBy(k => k.ProtectorId, StringComparer.Ordinal).ToList();
+        var fingerprint = Convert.ToHexString(SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(string.Join("|", keys.Select(k => $"{k.Drive}:{k.ProtectorId}:{k.RecoveryPassword}")))));
+        _pendingKeyFingerprint = fingerprint;
+        return fingerprint == _sentKeyFingerprint ? null : keys;
+    }
+
     private void CollectWindowsEvents()
     {
         try
@@ -447,6 +465,14 @@ public sealed partial class AgentRuntime : IDisposable
 
     private void RecordConnection(string id, ConnectedDevice device)
     {
+        var approved = ApprovedDevicesEnforcer.Active(CurrentPolicy, _clock.GetUtcNow())
+            .FirstOrDefault(a => string.Equals(a.DeviceInstanceId, id, StringComparison.OrdinalIgnoreCase) || string.Equals(a.ParentInstanceId, id, StringComparison.OrdinalIgnoreCase));
+        if (approved is not null)
+        {
+            _events.Enqueue(SecurityEventType.ApprovedDeviceConnected, EventSeverities.Information, $"Approved USB drive connected: {approved.Description} ({device.Name}) [{id}]");
+            return;
+        }
+
         var control = GoverningControl(device);
         var state = control is { } c ? StateOf(c) : ControlState.Unknown;
         switch (state)

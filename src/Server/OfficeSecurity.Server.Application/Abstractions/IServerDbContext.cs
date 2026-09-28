@@ -39,5 +39,7 @@ public interface IServerDbContext
 
     DbSet<ControlExemption> Exemptions { get; }
 
+    DbSet<BitLockerRecoveryKey> RecoveryKeys { get; }
+
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

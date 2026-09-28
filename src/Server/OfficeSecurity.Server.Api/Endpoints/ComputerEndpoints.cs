@@ -77,6 +77,13 @@ internal static class ComputerEndpoints
         write.MapPut(ApiRoutes.Computers + "/{id:guid}/staff", async (Guid id, AssignStaffRequest request, ComputerAdministration computers, HttpContext http, CancellationToken ct) =>
             (await computers.AssignStaffAsync(id, request, http.ToRequestContext(), ct)).ToHttp());
 
+        read.MapGet(ApiRoutes.Computers + "/{id:guid}/recovery-keys", async (Guid id, RecoveryKeyService keys, CancellationToken ct) =>
+            (await keys.ListAsync(id, ct)).ToHttp());
+
+        var superAdmin = app.MapGroup(string.Empty).RequireAuthorization(Policies.SuperAdmin).WithTags("Computers");
+        superAdmin.MapPost(ApiRoutes.Computers + "/{id:guid}/recovery-keys/{keyId:long}/reveal", async (Guid id, long keyId, RecoveryKeyService keys, HttpContext http, CancellationToken ct) =>
+            (await keys.RevealAsync(id, keyId, http.ToRequestContext(), ct)).ToHttp());
+
         read.MapGet(ApiRoutes.Computers + "/{id:guid}/exemptions", async (Guid id, ExemptionService exemptions, CancellationToken ct) =>
             (await exemptions.ListAsync(id, ct)).ToHttp());
 

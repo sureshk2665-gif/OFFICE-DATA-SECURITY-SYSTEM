@@ -115,6 +115,11 @@ internal sealed class WindowsAppControl(string workDirectory) : IAppControlPlatf
             script.AppendLine(CultureInfo.InvariantCulture, $"$rules += New-CIPolicyRule -FilePathRule {Tool.Quote(folder)}");
         }
 
+        foreach (var denied in build.DeniedFiles ?? [])
+        {
+            script.AppendLine(CultureInfo.InvariantCulture, $"$rules += New-CIPolicyRule -FilePathRule {Tool.Quote(denied)} -Deny");
+        }
+
         script.AppendLine("Merge-CIPolicy -PolicyPaths $base -Rules $rules -OutputFilePath $policy | Out-Null");
         // 0 UMCI, 6 unsigned policy, 11 scripts not restricted, 16 update without restart; 3 audit mode.
         foreach (var option in new[] { 0, 6, 11, 16 })

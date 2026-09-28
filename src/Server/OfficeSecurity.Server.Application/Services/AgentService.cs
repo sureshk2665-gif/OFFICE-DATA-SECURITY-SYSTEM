@@ -20,6 +20,7 @@ public sealed class AgentService(
     IPolicySigningService policySigner,
     PolicyService policies,
     SoftwareService software,
+    RecoveryKeyService recoveryKeys,
     OneTimeTicketStore<ComputerLoginTicket> loginTickets,
     TimeProvider clock)
 {
@@ -179,6 +180,7 @@ public sealed class AgentService(
             existing.Name = Clean(device.Name, 256) ?? existing.Name;
             existing.DeviceClass = Clean(device.DeviceClass, 64) ?? existing.DeviceClass;
             existing.Manufacturer = Clean(device.Manufacturer, 256);
+            existing.ParentInstanceId = Clean(device.ParentInstanceId, 400) ?? existing.ParentInstanceId;
             existing.IsConnected = true;
             existing.LastSeenUtc = now;
         }
@@ -187,6 +189,11 @@ public sealed class AgentService(
         if (request.Software is { } installed)
         {
             await software.ApplyInventoryAsync(computerId, installed, cancellationToken).ConfigureAwait(false);
+        }
+
+        if (request.RecoveryKeys is { Count: > 0 } keys)
+        {
+            await recoveryKeys.StoreAsync(computerId, keys, cancellationToken).ConfigureAwait(false);
         }
 
         return Done.Value;

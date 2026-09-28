@@ -22,6 +22,8 @@ public sealed class FileManagedSettingsStore(string directory, string fileName =
     public const string RegistryFile = "managed-registry-settings.json";
     public const string FirewallFile = "managed-firewall-rules.json";
     public const string AuditFile = "managed-audit-settings.json";
+    public const string WifiFile = "managed-wifi-filters.json";
+    public const string BluetoothFile = "managed-bluetooth.json";
 
     private static readonly JsonSerializerOptions Json = new() { WriteIndented = true };
     private readonly Lock _gate = new();
