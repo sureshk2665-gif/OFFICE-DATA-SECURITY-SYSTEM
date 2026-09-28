@@ -42,6 +42,12 @@ public sealed class ServerDbContext(DbContextOptions<ServerDbContext> options) :
 
     public DbSet<BitLockerRecoveryKey> RecoveryKeys => Set<BitLockerRecoveryKey>();
 
+    public DbSet<Alert> Alerts => Set<Alert>();
+
+    public DbSet<AlertRuleSetting> AlertRules => Set<AlertRuleSetting>();
+
+    public DbSet<SystemSetting> Settings => Set<SystemSetting>();
+
     protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
     {
         ArgumentNullException.ThrowIfNull(configurationBuilder);
@@ -59,6 +65,7 @@ public sealed class ServerDbContext(DbContextOptions<ServerDbContext> options) :
         configurationBuilder.Properties<ComputerStatus>().HaveConversion<string>().HaveMaxLength(32);
         configurationBuilder.Properties<SoftwareRequestStatus>().HaveConversion<string>().HaveMaxLength(32);
         configurationBuilder.Properties<DeploymentStatus>().HaveConversion<string>().HaveMaxLength(32);
+        configurationBuilder.Properties<AlertStatus>().HaveConversion<string>().HaveMaxLength(16);
     }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -272,6 +279,40 @@ public sealed class ServerDbContext(DbContextOptions<ServerDbContext> options) :
             e.Property(x => x.ProtectorId).HasMaxLength(64);
             e.HasIndex(x => new { x.ComputerId, x.ProtectorId }).IsUnique();
             e.HasOne<Computer>().WithMany().HasForeignKey(x => x.ComputerId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<Alert>(e =>
+        {
+            e.ToTable("alerts");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.RuleCode).HasMaxLength(64);
+            e.Property(x => x.Severity).HasMaxLength(16);
+            e.Property(x => x.Subject).HasMaxLength(256);
+            e.Property(x => x.Title).HasMaxLength(300);
+            e.Property(x => x.Details).HasMaxLength(2000);
+            e.Property(x => x.AcknowledgedBy).HasMaxLength(100);
+            e.Property(x => x.ResolvedBy).HasMaxLength(100);
+            e.Property(x => x.ResolutionNote).HasMaxLength(1000);
+            e.HasIndex(x => new { x.RuleCode, x.ComputerId, x.Subject, x.Status });
+            e.HasIndex(x => new { x.Status, x.LastSeenUtc });
+            e.HasOne<Computer>().WithMany().HasForeignKey(x => x.ComputerId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<AlertRuleSetting>(e =>
+        {
+            e.ToTable("alert_rules");
+            e.HasKey(x => x.Code);
+            e.Property(x => x.Code).HasMaxLength(64);
+            e.Property(x => x.Severity).HasMaxLength(16);
+            e.Property(x => x.UpdatedBy).HasMaxLength(100);
+        });
+
+        modelBuilder.Entity<SystemSetting>(e =>
+        {
+            e.ToTable("system_settings");
+            e.HasKey(x => x.Key);
+            e.Property(x => x.Key).HasMaxLength(100);
+            e.Property(x => x.Value).HasMaxLength(4000);
         });
 
         modelBuilder.Entity<StaffComputerAssignment>(e =>

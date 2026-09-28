@@ -41,5 +41,11 @@ public interface IServerDbContext
 
     DbSet<BitLockerRecoveryKey> RecoveryKeys { get; }
 
+    DbSet<Alert> Alerts { get; }
+
+    DbSet<AlertRuleSetting> AlertRules { get; }
+
+    DbSet<SystemSetting> Settings { get; }
+
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

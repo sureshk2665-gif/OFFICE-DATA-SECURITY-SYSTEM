@@ -65,4 +65,6 @@ public sealed record DashboardOverviewResponse(
     int ComputersPendingApproval,
     int ComputersWithFailedControls,
     int PendingSoftwareRequests,
-    int ComputersWithUnapprovedSoftware);
+    int ComputersWithUnapprovedSoftware,
+    int OpenAlerts = 0,
+    int OpenCriticalAlerts = 0);

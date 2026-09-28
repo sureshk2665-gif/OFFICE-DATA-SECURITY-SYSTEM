@@ -19,6 +19,9 @@ public sealed class ServerPaths
     /// <summary>Approved installer files.</summary>
     public string PackagesDirectory => Path.Combine(DataDirectory, "packages");
 
+    /// <summary>Automatic weekly and monthly security summaries (PDF).</summary>
+    public string ReportsDirectory => Path.Combine(DataDirectory, "reports");
+
     /// <summary>Written only while no administrator exists; deleted after the first administrator is set up.</summary>
     public string FirstAdminSetupCodeFile => Path.Combine(DataDirectory, "FIRST-ADMIN-SETUP-CODE.txt");
 

@@ -33,6 +33,11 @@ static void RunAgent(string[] args)
     });
 
     builder.Services.AddWindowsService(options => options.ServiceName = AgentPaths.ServiceName);
+    if (WindowsServiceHelpers.IsWindowsService())
+    {
+        // Same as the standard service lifetime, but remembers when Windows is shutting down (see AgentWorker.StopAsync).
+        builder.Services.AddSingleton<IHostLifetime, AgentServiceLifetime>();
+    }
 
     var paths = new AgentPaths(builder.Configuration["Agent:DataDirectory"] is { Length: > 0 } dir ? dir : AgentPaths.DefaultDataDirectory());
     SecureDirectory.CreateAndProtect(paths.DataDirectory);

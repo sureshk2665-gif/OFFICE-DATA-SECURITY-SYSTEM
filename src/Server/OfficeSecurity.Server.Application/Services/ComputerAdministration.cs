@@ -207,7 +207,8 @@ public sealed class ComputerAdministration(
         return staff.OrderBy(s => s.DisplayName).ToList();
     }
 
-    public async Task<PagedResult<SecurityEventResponse>> ListEventsAsync(int page, int pageSize, Guid? computerId, string? search, CancellationToken cancellationToken = default)
+    public async Task<PagedResult<SecurityEventResponse>> ListEventsAsync(int page, int pageSize, Guid? computerId, string? search,
+        string? severity = null, string? type = null, DateTimeOffset? from = null, DateTimeOffset? to = null, CancellationToken cancellationToken = default)
     {
         (page, pageSize) = Paging.Normalize(page, pageSize);
         var query = from e in db.SecurityEvents.AsNoTracking()
@@ -216,6 +217,26 @@ public sealed class ComputerAdministration(
         if (computerId is { } cid)
         {
             query = query.Where(x => x.Event.ComputerId == cid);
+        }
+
+        if (!string.IsNullOrWhiteSpace(severity))
+        {
+            query = query.Where(x => x.Event.Severity == severity);
+        }
+
+        if (!string.IsNullOrWhiteSpace(type))
+        {
+            query = query.Where(x => x.Event.EventType == type);
+        }
+
+        if (from is { } start)
+        {
+            query = query.Where(x => x.Event.OccurredAtUtc >= start);
+        }
+
+        if (to is { } end)
+        {
+            query = query.Where(x => x.Event.OccurredAtUtc < end);
         }
 
         if (!string.IsNullOrWhiteSpace(search))

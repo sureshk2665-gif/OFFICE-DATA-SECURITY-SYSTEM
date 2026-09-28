@@ -12,6 +12,7 @@ using OfficeSecurity.Server.Api.Security;
 using OfficeSecurity.Server.Application.Abstractions;
 using OfficeSecurity.Server.Application.Common;
 using OfficeSecurity.Server.Application.Security;
+using OfficeSecurity.Server.Application.Reports;
 using OfficeSecurity.Server.Application.Services;
 using OfficeSecurity.Server.Infrastructure.Certificates;
 using OfficeSecurity.Server.Infrastructure.Persistence;
@@ -80,6 +81,13 @@ builder.Services.AddScoped<RecoveryKeyService>();
 builder.Services.AddScoped<ComputerAdministration>();
 builder.Services.AddScoped<AgentService>();
 builder.Services.AddScoped<SoftwareService>();
+builder.Services.AddSingleton<AlertEngineLock>();
+builder.Services.AddScoped<AlertEngine>();
+builder.Services.AddScoped<AlertService>();
+builder.Services.AddScoped<ReportService>();
+builder.Services.AddSingleton(new SavedReportsOptions(paths.ReportsDirectory));
+builder.Services.AddScoped<ScheduledReports>();
+builder.Services.AddHostedService<ScheduledWorkService>();
 builder.Services.AddSingleton<IPackageStorage>(new FilePackageStorage(paths.PackagesDirectory));
 
 builder.Services.AddAuthentication(SessionAuthenticationHandler.SchemeName)
@@ -124,6 +132,8 @@ app.MapAuthEndpoints();
 app.MapAdministrationEndpoints();
 app.MapComputerEndpoints();
 app.MapSoftwareEndpoints();
+app.MapAlertEndpoints();
+app.MapReportEndpoints();
 
 await ServerStartup.InitializeAsync(app, certificates, httpsPort);
 await app.RunAsync();

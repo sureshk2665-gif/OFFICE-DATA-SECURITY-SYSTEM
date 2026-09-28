@@ -47,8 +47,9 @@ internal static class ComputerEndpoints
         read.MapGet(ApiRoutes.Computers + "/{id:guid}", async (Guid id, ComputerAdministration computers, CancellationToken ct) =>
             (await computers.GetAsync(id, ct)).ToHttp());
 
-        read.MapGet(ApiRoutes.Events, async (ComputerAdministration computers, int? page, int? pageSize, Guid? computerId, string? search, CancellationToken ct) =>
-            TypedResults.Ok(await computers.ListEventsAsync(page ?? 1, pageSize ?? 50, computerId, search, ct)));
+        read.MapGet(ApiRoutes.Events, async (ComputerAdministration computers, int? page, int? pageSize, Guid? computerId, string? search,
+                string? severity, string? type, DateTimeOffset? from, DateTimeOffset? to, CancellationToken ct) =>
+            TypedResults.Ok(await computers.ListEventsAsync(page ?? 1, pageSize ?? 50, computerId, search, severity, type, from, to, ct)));
 
         read.MapGet(ApiRoutes.Policies, async (PolicyService policies, CancellationToken ct) =>
             TypedResults.Ok(await policies.ListAsync(ct)));

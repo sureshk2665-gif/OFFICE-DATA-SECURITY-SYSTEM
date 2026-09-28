@@ -327,10 +327,12 @@ public sealed class AccountAdministration(
             .Distinct().ToListAsync(cancellationToken).ConfigureAwait(false);
         var withUnapproved = installed.Where(i => !approved.Any(a => a.Matches(i.Name, i.Publisher))).Select(i => i.ComputerId).Distinct().Count();
 
+        var openAlerts = await db.Alerts.AsNoTracking().Where(a => a.Status == AlertStatus.Open).Select(a => a.Severity).ToListAsync(cancellationToken).ConfigureAwait(false);
+
         return new DashboardOverviewResponse(
             counts.Sum(c => c.Count), Count(AccountStatus.Active), Count(AccountStatus.PendingActivation), Count(AccountStatus.Disabled), admins, failedLogins,
             trusted.Count, online, trusted.Count - online, computers.Count(c => c.Status == ComputerStatus.PendingApproval), trusted.Count(c => c.FailedControls > 0),
-            pendingRequests, withUnapproved);
+            pendingRequests, withUnapproved, openAlerts.Count, openAlerts.Count(s => s == EventSeverities.Critical));
     }
 
     // ---------------------------------------------------------------- helpers

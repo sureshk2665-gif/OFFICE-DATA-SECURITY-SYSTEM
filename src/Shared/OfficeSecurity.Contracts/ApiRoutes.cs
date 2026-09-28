@@ -32,6 +32,11 @@ public static class ApiRoutes
     public const string EnrollmentCodes = Computers + "/enrollment-codes";
     public const string Policies = Prefix + "/policies";
     public const string Events = Prefix + "/events";
+    public const string Alerts = Prefix + "/alerts";
+    public const string AlertSummary = Alerts + "/summary";
+    public const string AlertRules = Alerts + "/rules";
+    public const string Reports = Prefix + "/reports";
+    public const string SavedReports = Reports + "/saved";
 
     public const string AgentEnroll = Prefix + "/agent/enroll";
     public const string AgentEnrollStatus = Prefix + "/agent/enroll/status";
@@ -63,6 +68,12 @@ public static class ApiRoutes
     public static string ApprovedSoftwarePackages(Guid id) => $"{ApprovedSoftware}/{id}/packages";
     public static string SoftwarePackageById(Guid id) => $"{SoftwarePackages}/{id}";
     public static string DeploymentCancel(Guid id) => $"{SoftwareDeployments}/{id}/cancel";
+
+    public static string AlertAcknowledge(Guid id) => $"{Alerts}/{id}/acknowledge";
+    public static string AlertResolve(Guid id) => $"{Alerts}/{id}/resolve";
+    public static string AlertRuleByCode(string code) => $"{AlertRules}/{code}";
+    public static string Report(string type) => $"{Reports}/{type}";
+    public static string SavedReport(string fileName) => $"{SavedReports}/{Uri.EscapeDataString(fileName)}";
 
     public static string ComputerById(Guid id) => $"{Computers}/{id}";
     public static string ComputerApprove(Guid id) => $"{Computers}/{id}/approve";

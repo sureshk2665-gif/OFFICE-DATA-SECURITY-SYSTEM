@@ -40,6 +40,12 @@ internal sealed partial class AgentWorker(AgentRuntime runtime, AgentLocalServer
         await pipe;
     }
 
+    public override async Task StopAsync(CancellationToken cancellationToken)
+    {
+        await base.StopAsync(cancellationToken);
+        await runtime.NotifyStoppingAsync(AgentServiceLifetime.WindowsShuttingDown, TimeSpan.FromSeconds(5));
+    }
+
     [LoggerMessage(Level = LogLevel.Error, Message = "Unexpected agent error; retrying in one minute.")]
     private static partial void LogUnexpected(ILogger logger, Exception exception);
 }

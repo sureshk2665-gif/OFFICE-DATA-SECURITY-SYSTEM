@@ -153,6 +153,46 @@ public sealed partial class AgentRuntime : IDisposable
         }
     }
 
+    /// <summary>Text of the notice sent when Windows shuts down; the server does not raise an alert for it.</summary>
+    public const string ShutdownNotice = "Windows is shutting down or restarting; the agent stops until Windows starts again.";
+
+    /// <summary>
+    /// Tells the server the agent is stopping, so a computer that is switched off is not mistaken for one whose
+    /// agent was stopped. Best effort: waits at most a few seconds for the server.
+    /// </summary>
+    public async Task NotifyStoppingAsync(bool windowsShuttingDown, TimeSpan timeout)
+    {
+        var config = _configStore.Load();
+        if (config.State != AgentState.Enrolled)
+        {
+            return;
+        }
+
+        if (windowsShuttingDown)
+        {
+            _events.Enqueue(SecurityEventType.AgentStoppedOrUnavailable, EventSeverities.Information, ShutdownNotice);
+        }
+        else
+        {
+            _events.Enqueue(SecurityEventType.AgentStoppedOrUnavailable, EventSeverities.Warning,
+                "The agent service was stopped while Windows kept running (only an administrator can do this). Protections are no longer checked or restored until it starts again.");
+        }
+
+        using var cts = new CancellationTokenSource(timeout);
+        try
+        {
+            var pending = _events.PeekPending(_options.EventUploadBatchSize);
+            await GetClient(config).SendEventsAsync(new AgentEventsRequest(pending), cts.Token).ConfigureAwait(false);
+            _events.MarkUploaded(pending.Select(e => e.EventId));
+        }
+#pragma warning disable CA1031 // Stopping must never fail; the notice stays queued and is sent at the next start.
+        catch (Exception ex)
+#pragma warning restore CA1031
+        {
+            LogStopNoticeNotSent(_logger, ex.Message);
+        }
+    }
+
     /// <summary>What the staff application on this computer may know about the agent.</summary>
     public AgentLocalStatus GetLocalStatus()
     {
@@ -367,6 +407,9 @@ public sealed partial class AgentRuntime : IDisposable
             _nextInventory = _clock.GetUtcNow();
         }
     }
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "The stop notice could not be sent now ({Reason}); it is sent at the next start.")]
+    private static partial void LogStopNoticeNotSent(ILogger logger, string reason);
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Installation interrupted; it will be retried: {Message}")]
     private static partial void LogInstallationError(ILogger logger, string message);

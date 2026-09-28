@@ -29,6 +29,8 @@ public sealed partial class ServerFactory : WebApplicationFactory<Program>
         builder.UseSetting("Server:HttpsPort", HttpsPort.ToString(System.Globalization.CultureInfo.InvariantCulture));
         builder.UseSetting("Security:PasswordHashIterations", "1000");
         builder.UseSetting("Security:SignInRequestsPerMinute", "100000");
+        // The tests run the alert engine themselves (RunAlertEngineAsync), at the moments they choose.
+        builder.UseSetting("Alerts:IntervalSeconds", "0");
         builder.ConfigureTestServices(services =>
         {
             services.AddSingleton<TimeProvider>(Clock);
@@ -51,6 +53,13 @@ public sealed partial class ServerFactory : WebApplicationFactory<Program>
     }
 
     public string DatabaseFile => Path.Combine(DataDirectory, "office-security.db");
+
+    /// <summary>One run of the server's alert engine (normally every 30 seconds).</summary>
+    public async Task<int> RunAlertEngineAsync()
+    {
+        await using var scope = Services.CreateAsyncScope();
+        return await scope.ServiceProvider.GetRequiredService<OfficeSecurity.Server.Application.Services.AlertEngine>().RunOnceAsync();
+    }
 
     /// <summary>True after <see cref="StartRealHttps"/>: requests go over real TLS to Kestrel.</summary>
     public bool RealTls { get; private set; }
@@ -118,9 +127,15 @@ public sealed partial class ServerFactory : WebApplicationFactory<Program>
     /// <summary>Bootstraps the owner account and returns a signed-in super administrator token.</summary>
     public async Task<string> OwnerTokenAsync()
     {
-        var secret = await BootstrapAdminAsync();
-        return await LoginAdminAsync(AdminUser, AdminPassword, secret);
+        OwnerSecret = await BootstrapAdminAsync();
+        return await LoginAdminAsync(AdminUser, AdminPassword, OwnerSecret);
     }
+
+    /// <summary>The owner's authenticator secret (after <see cref="OwnerTokenAsync"/>), to sign in again after the clock moved on.</summary>
+    public string? OwnerSecret { get; private set; }
+
+    /// <summary>A new owner session, for tests that move the clock past the sign-in lifetime.</summary>
+    public async Task<HttpClient> FreshOwnerClientAsync() => Client(await LoginAdminAsync(AdminUser, AdminPassword, OwnerSecret!));
 
     /// <summary>Creates an administrator with the given role, activates it and returns (token, secret).</summary>
     public async Task<(string Token, string Secret)> CreateAdminAsync(string ownerToken, string username, string role)
