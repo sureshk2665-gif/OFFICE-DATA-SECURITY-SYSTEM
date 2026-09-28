@@ -82,8 +82,8 @@ PC during the pilot.
 
 1. **Bluetooth: switching the setting off could switch on an adapter that was already off** before the agent
    touched it. Found in review. Fixed so the agent only switches back on the adapters it switched off, and a
-   test was added. This fix is in commit `0029426`, after the CI run above; its Windows run was still in progress
-   when this report was written.
+   test was added. This fix is in commit `0029426`. Its Windows run also passed completely, including the end-to-end test:
+   https://github.com/sureshk2665-gif/OFFICE-DATA-SECURITY-SYSTEM/actions/runs/36406840417
 
 ## NOT tested yet — must be checked on a real office PC (use the pilot checklist in READ-ME-FIRST)
 
