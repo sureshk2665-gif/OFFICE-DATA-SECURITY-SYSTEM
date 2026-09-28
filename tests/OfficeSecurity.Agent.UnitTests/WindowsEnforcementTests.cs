@@ -36,6 +36,18 @@ public sealed class PolicyDefinitionTests(ITestOutputHelper output)
         await CheckAsync("WindowsDefender.admx", new ControlledFolderAccessEnforcer(Engine(out var r), new ActiveDefender(), NoEnforcementEvents.Instance, TimeProvider.System),
             s => s with { FileProtection = new() { ProtectedFolders = [new(@"D:\Company", false, true)] } }, r);
 
+    [WindowsFact]
+    public async Task Approved_usb_drive_values_match_the_windows_policy_definitions() =>
+        await CheckAsync("DeviceInstallation.admx", new ApprovedDevicesEnforcer(Engine(out var r), new InMemoryUsbStorageDevices(), NoEnforcementEvents.Instance, TimeProvider.System),
+            s => s with
+            {
+                RemovableStorage = new()
+                {
+                    Mode = EnforcementMode.Enforce,
+                    ApprovedDevices = [new(@"USBSTOR\DISK&VEN_TEST&PROD_DRIVE\0123456789&0", "Test drive", null, @"USB\VID_0781&PID_5581\0123456789")],
+                },
+            }, r);
+
     private sealed class ActiveDefender : IDefenderStatus
     {
         public string? InactiveReason() => null;

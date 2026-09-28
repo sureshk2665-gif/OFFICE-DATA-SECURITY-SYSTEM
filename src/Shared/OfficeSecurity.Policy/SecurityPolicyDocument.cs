@@ -136,7 +136,7 @@ public sealed record NetworkSettings
     /// <summary>Full paths of programs denied outbound network access by Windows Firewall.</summary>
     public IReadOnlyList<string> BlockedApplicationPaths { get; init; } = [];
 
-    /// <summary>When non-empty, only these Wi-Fi network names may be used (blocks phone hotspots). Not enforced yet.</summary>
+    /// <summary>When non-empty, only these Wi-Fi network names may be used (blocks phone hotspots).</summary>
     public IReadOnlyList<string> AllowedWifiNetworks { get; init; } = [];
 }
 

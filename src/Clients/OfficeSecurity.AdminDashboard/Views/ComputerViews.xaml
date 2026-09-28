@@ -113,7 +113,7 @@
         <Border Style="{StaticResource Card}">
           <StackPanel>
             <TextBlock Text="USB storage, phones and Bluetooth devices seen on this computer" Style="{StaticResource Text.SectionTitle}" />
-            <DataGrid ItemsSource="{Binding Detail.Devices}" Style="{StaticResource Grid.Table}" MinHeight="80" MaxHeight="240">
+            <DataGrid ItemsSource="{Binding Detail.Devices}" SelectedItem="{Binding SelectedDevice}" Style="{StaticResource Grid.Table}" MinHeight="80" MaxHeight="240">
               <DataGrid.Columns>
                 <DataGridTextColumn Header="Device" Binding="{Binding Name}" Width="*" />
                 <DataGridTextColumn Header="Type" Binding="{Binding DeviceClass}" Width="100" />
@@ -123,6 +123,38 @@
                 <DataGridTextColumn Header="Hardware ID" Binding="{Binding InstanceId}" Width="260" />
               </DataGrid.Columns>
             </DataGrid>
+            <StackPanel Visibility="{Binding CanWrite, Converter={StaticResource BoolToVisibility}}" Margin="0,12,0,0">
+              <TextBlock Style="{StaticResource Text.Muted}" TextWrapping="Wrap" Margin="0,0,0,6"
+                         Text="Approve a company USB drive: select it above (type DiskDrive), describe it and click Approve. It is added to this computer's policy, so it works on every computer using that policy while other USB drives stay blocked. Remove approvals in Security Policies." />
+              <StackPanel Orientation="Horizontal">
+                <TextBox Text="{Binding ApproveDeviceDescription, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource TextBox.Field}" Width="300" ToolTip="Description, e.g. Accounts backup drive (blue)" />
+                <ComboBox ItemsSource="{Binding ApproveDeviceDurations}" SelectedItem="{Binding ApproveDeviceDuration}" DisplayMemberPath="Label" Width="130" Margin="8,0,0,0" ToolTip="Approved until" />
+                <Button Content="Approve this USB drive" Command="{Binding ApproveDeviceCommand}" IsEnabled="{Binding CanApproveDevice}" Style="{StaticResource Button.Primary}" Margin="8,0,0,0" />
+              </StackPanel>
+            </StackPanel>
+          </StackPanel>
+        </Border>
+
+        <Border Style="{StaticResource Card}">
+          <StackPanel>
+            <TextBlock Text="BitLocker recovery keys" Style="{StaticResource Text.SectionTitle}" />
+            <TextBlock Style="{StaticResource Text.Muted}" Margin="0,0,0,8" TextWrapping="Wrap"
+                       Text="Sent by the agent when the policy requires BitLocker. Stored encrypted on the server. Only a super administrator can show a key, and every time is recorded in the audit log. Old keys are kept." />
+            <DataGrid ItemsSource="{Binding RecoveryKeys}" SelectedItem="{Binding SelectedRecoveryKey}" Style="{StaticResource Grid.Table}" MinHeight="60" MaxHeight="180">
+              <DataGrid.Columns>
+                <DataGridTextColumn Header="Drive" Binding="{Binding Drive}" Width="60" />
+                <DataGridTextColumn Header="Key ID" Binding="{Binding ProtectorId}" Width="*" />
+                <DataGridTextColumn Header="First received" Binding="{Binding FirstReportedUtc, Converter={StaticResource LocalTime}}" Width="140" />
+                <DataGridTextColumn Header="Last confirmed" Binding="{Binding LastReportedUtc, Converter={StaticResource LocalTime}}" Width="140" />
+              </DataGrid.Columns>
+            </DataGrid>
+            <StackPanel Visibility="{Binding CanRevealKeys, Converter={StaticResource BoolToVisibility}}" Margin="0,12,0,0">
+              <StackPanel Orientation="Horizontal">
+                <Button Content="Show selected recovery key" Command="{Binding RevealRecoveryKeyCommand}" IsEnabled="{Binding CanRevealSelectedKey}" Style="{StaticResource Button.Secondary}" />
+                <Button Content="Hide" Command="{Binding HideRecoveryKeyCommand}" Style="{StaticResource Button.Secondary}" Margin="8,0,0,0" />
+              </StackPanel>
+              <TextBox Text="{Binding RevealedKeyText, Mode=OneWay}" IsReadOnly="True" FontFamily="Consolas" FontSize="15" Margin="0,8,0,0" BorderThickness="0" Background="Transparent" />
+            </StackPanel>
           </StackPanel>
         </Border>
 
@@ -292,14 +324,25 @@
               <CheckBox Content="Also block CD/DVD drives" IsChecked="{Binding BlockOpticalDrives}" Margin="0,4,0,0" />
               <TextBlock Style="{StaticResource Text.Muted}" TextWrapping="Wrap" Margin="0,4,0,0"
                          Text="Keyboards, mice and printers keep working. Applies to every user, including administrators. To allow a USB drive on one computer for a while, use 'Temporary exceptions' on the computer's page." />
+              <TextBlock Text="Approved USB drives (work while others are blocked; add them from a computer's page)" Style="{StaticResource Text.Label}" TextWrapping="Wrap" />
+              <DataGrid ItemsSource="{Binding ApprovedDevices}" SelectedItem="{Binding SelectedApprovedDevice}" Style="{StaticResource Grid.Table}" MinHeight="50" MaxHeight="150">
+                <DataGrid.Columns>
+                  <DataGridTextColumn Header="Description" Binding="{Binding Description}" Width="*" />
+                  <DataGridTextColumn Header="Until" Binding="{Binding ExpiresAtUtc, Converter={StaticResource LocalTime}, TargetNullValue='no end date'}" Width="120" />
+                  <DataGridTextColumn Header="Hardware ID" Binding="{Binding DeviceInstanceId}" Width="160" />
+                </DataGrid.Columns>
+              </DataGrid>
+              <Button Content="Remove selected drive" Command="{Binding RemoveApprovedDeviceCommand}" Style="{StaticResource Button.Secondary}" HorizontalAlignment="Left" Margin="0,4,0,0" />
 
               <TextBlock Text="Software installation by staff" Style="{StaticResource Text.SectionTitle}" Margin="0,16,0,4" />
               <CheckBox Content="Stop staff installing programs for themselves (Windows Installer and Store apps)" IsChecked="{Binding BlockStaffInstalls}" />
               <TextBlock Style="{StaticResource Text.Muted}" TextWrapping="Wrap" Margin="0,4,0,0"
-                         Text="Installations you approve in 'Software Management' still work. Portable programs are not stopped until Application Control is available." />
+                         Text="Installations you approve in 'Software Management' still work. Portable programs are only stopped by Application Control (below)." />
 
-              <TextBlock Text="Bluetooth (not available yet — no effect)" Style="{StaticResource Text.SectionTitle}" Margin="0,16,0,4" />
+              <TextBlock Text="Bluetooth" Style="{StaticResource Text.SectionTitle}" Margin="0,16,0,4" />
               <ComboBox ItemsSource="{Binding BluetoothModes}" SelectedItem="{Binding BluetoothMode}" Width="200" HorizontalAlignment="Left" />
+              <TextBlock Style="{StaticResource Text.Muted}" TextWrapping="Wrap" Margin="0,4,0,0"
+                         Text="BlockFileTransfer: stops Windows' Bluetooth file transfer program; keyboards, mice and headsets keep working. Needs Application Control set to Enforce (Audit only records). DisableRadio: switches Bluetooth off completely, including wireless keyboards, mice and headsets." />
 
               <TextBlock Text="Programs staff bring in (Application Control)" Style="{StaticResource Text.SectionTitle}" Margin="0,16,0,4" TextWrapping="Wrap" />
               <ComboBox ItemsSource="{Binding EnforcementModes}" SelectedItem="{Binding ApplicationControlMode}" Width="160" HorizontalAlignment="Left" />
@@ -312,7 +355,7 @@
               <CheckBox Content="Record who signs in to Windows, failed sign-ins and sign-outs" IsChecked="{Binding RecordWindowsSignIns}" />
 
               <TextBlock Text="Disk encryption" Style="{StaticResource Text.SectionTitle}" Margin="0,16,0,4" />
-              <CheckBox Content="Require BitLocker on all fixed drives (checked and reported; not switched on automatically)" IsChecked="{Binding RequireBitLocker}" />
+              <CheckBox Content="Require BitLocker on all fixed drives (checked and reported, recovery keys sent to the server; not switched on automatically)" IsChecked="{Binding RequireBitLocker}" />
             </StackPanel>
 
             <StackPanel Grid.Column="2">
@@ -326,8 +369,10 @@
               <TextBox Text="{Binding AllowedUrls, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True" Height="70" VerticalScrollBarVisibility="Auto" />
 
               <TextBlock Text="Network" Style="{StaticResource Text.SectionTitle}" Margin="0,16,0,4" />
-              <TextBlock Text="Allowed Wi-Fi networks (not available yet — no effect)" Style="{StaticResource Text.Label}" />
+              <TextBlock Text="Allowed Wi-Fi networks (one name per line; empty = any network)" Style="{StaticResource Text.Label}" />
               <TextBox Text="{Binding AllowedWifiNetworks, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True" Height="50" VerticalScrollBarVisibility="Auto" />
+              <TextBlock Style="{StaticResource Text.Muted}" TextWrapping="Wrap" Margin="0,4,0,0"
+                         Text="Other Wi-Fi networks, such as phone hotspots, are hidden and cannot be joined. Safety rule: if the computer is connected to a network that is not on this list, the restriction is not applied (so it cannot cut off the computer) and the computer reports it. Wired network is not affected." />
               <TextBlock Text="Programs without network access (full path, one per line, e.g. C:\Program Files\Dropbox\Client\Dropbox.exe)" Style="{StaticResource Text.Label}" TextWrapping="Wrap" />
               <TextBox Text="{Binding BlockedApplications, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True" Height="50" VerticalScrollBarVisibility="Auto" />
 

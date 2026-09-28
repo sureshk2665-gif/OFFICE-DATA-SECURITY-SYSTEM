@@ -22,11 +22,44 @@ public sealed partial class StaffChoice(StaffSummary staff, bool selected) : Obs
 public sealed record PolicyChoice(Guid? Id, string Name);
 
 /// <summary>Computers: add (enrollment code), approve, remove, and see status, inventory and assignments.</summary>
-public sealed partial class ComputersViewModel(ShellViewModel shell, bool canWrite) : SectionViewModel("Computers")
+public sealed partial class ComputersViewModel(ShellViewModel shell, bool canWrite, bool canRevealKeys = false) : SectionViewModel("Computers")
 {
     private const int PageSize = 25;
 
     public bool CanWrite { get; } = canWrite;
+
+    /// <summary>Only super administrators may see BitLocker recovery keys (the server enforces this too).</summary>
+    public bool CanRevealKeys { get; } = canRevealKeys;
+
+    // ---- approved USB drives
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanApproveDevice))]
+    public partial DeviceSummary? SelectedDevice { get; set; }
+
+    public bool CanApproveDevice => CanWrite && SelectedDevice is { DeviceClass: "DiskDrive" };
+
+    [ObservableProperty]
+    public partial string ApproveDeviceDescription { get; set; } = string.Empty;
+
+    public IReadOnlyList<NamedChoice<int>> ApproveDeviceDurations { get; } =
+    [
+        new(0, "No end date"), new(1, "1 day"), new(7, "1 week"), new(30, "30 days"), new(365, "1 year"),
+    ];
+
+    [ObservableProperty]
+    public partial NamedChoice<int>? ApproveDeviceDuration { get; set; }
+
+    // ---- BitLocker recovery keys
+    public ObservableCollection<RecoveryKeyResponse> RecoveryKeys { get; } = [];
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanRevealSelectedKey))]
+    public partial RecoveryKeyResponse? SelectedRecoveryKey { get; set; }
+
+    public bool CanRevealSelectedKey => CanRevealKeys && SelectedRecoveryKey is not null;
+
+    [ObservableProperty]
+    public partial string RevealedKeyText { get; set; } = string.Empty;
 
     public ObservableCollection<ComputerSummary> Items { get; } = [];
 
@@ -148,6 +181,8 @@ public sealed partial class ComputersViewModel(ShellViewModel shell, bool canWri
         InstalledSoftware.Add(new InstalledSoftwareResponse(detail.Summary.Id, detail.Summary.Hostname, "Free Game", "2.0", "Games Ltd", "User", false, DateTimeOffset.UtcNow));
         Exemptions.Add(new ExemptionResponse(Guid.NewGuid(), detail.Summary.Id, nameof(SecurityControl.RemovableStorage), "Copy scanner files",
             DateTimeOffset.UtcNow, DateTimeOffset.UtcNow.AddHours(2), DateTimeOffset.UtcNow, "Owner", true, null));
+        RecoveryKeys.Add(new RecoveryKeyResponse(1, "C:", "{00000000-0000-0000-0000-000000000000}", DateTimeOffset.UtcNow, DateTimeOffset.UtcNow));
+        SelectedDevice = detail.Devices.FirstOrDefault(d => d.DeviceClass == "DiskDrive");
         Installations.Add(new DeploymentResponse(Guid.NewGuid(), Guid.NewGuid(), "Contoso Viewer", "viewer.msi", detail.Summary.Id, detail.Summary.Hostname, null, "Queued", 0, null, null, DateTimeOffset.UtcNow, null));
     }
 
@@ -295,6 +330,80 @@ public sealed partial class ComputersViewModel(ShellViewModel shell, bool canWri
         }
     });
 
+    /// <summary>
+    /// Adds the selected USB drive to the approved devices of the policy this computer uses, so it works on every
+    /// computer with that policy (other USB drives stay blocked).
+    /// </summary>
+    [RelayCommand]
+    private Task ApproveDeviceAsync() => RunAsync(async () =>
+    {
+        if (Selected is not { } computer || Detail is not { } detail || SelectedDevice is not { DeviceClass: "DiskDrive" } device)
+        {
+            ErrorMessage = "Select a USB drive in the list first.";
+            return;
+        }
+
+        var description = ApproveDeviceDescription.Trim();
+        if (description.Length == 0)
+        {
+            ErrorMessage = "Enter a description, for example \"Accounts team backup drive (blue)\".";
+            return;
+        }
+
+        var days = ApproveDeviceDuration?.Value ?? 0;
+        var policies = await shell.Api.ListPoliciesAsync();
+        var summary = detail.PolicyId is { } pid ? policies.FirstOrDefault(p => p.Id == pid) : policies.FirstOrDefault(p => p.IsDefault);
+        if (summary is null)
+        {
+            ErrorMessage = "The policy of this computer could not be found.";
+            return;
+        }
+
+        if (!shell.Ui.Confirm("Approve USB drive",
+                $"Approve \"{device.Name}\" ({description}) in the policy \"{summary.Name}\"{(days > 0 ? $" for {ApproveDeviceDuration!.Label}" : string.Empty)}?"
+                + $"{Environment.NewLine}{Environment.NewLine}It will work on all {summary.ComputerCount} computer(s) using this policy while USB drives are blocked. "
+                + "Running programs from it stays blocked. Only approve drives that belong to the company."))
+        {
+            return;
+        }
+
+        var policy = await shell.Api.GetPolicyAsync(summary.Id);
+        var storage = policy.Settings.RemovableStorage;
+        var approved = storage.ApprovedDevices
+            .Where(a => !string.Equals(a.DeviceInstanceId, device.InstanceId, StringComparison.OrdinalIgnoreCase))
+            .Append(new ApprovedDevice(device.InstanceId, description, days > 0 ? DateTimeOffset.UtcNow.AddDays(days) : null, device.ParentInstanceId))
+            .ToList();
+        var settings = policy.Settings with { RemovableStorage = storage with { ApprovedDevices = approved } };
+        await shell.Api.UpdatePolicyAsync(policy.Id, new SavePolicyRequest(policy.Name, policy.Description, settings));
+        ApproveDeviceDescription = string.Empty;
+        InfoMessage = storage.Mode == EnforcementMode.Enforce
+            ? $"\"{device.Name}\" approved in \"{policy.Name}\". Computers apply this at their next check-in; reconnect the drive afterwards."
+            : $"\"{device.Name}\" approved in \"{policy.Name}\". Note: USB drives are not blocked by this policy yet (mode {storage.Mode}), so the approval has no effect until you set it to Enforce.";
+        await LoadDetailAsync(computer.Id);
+    });
+
+    [RelayCommand]
+    private Task RevealRecoveryKeyAsync() => RunAsync(async () =>
+    {
+        if (Selected is not { } computer || SelectedRecoveryKey is not { } key || !CanRevealKeys)
+        {
+            return;
+        }
+
+        if (!shell.Ui.Confirm("Show BitLocker recovery key",
+                $"Show the recovery key for drive {key.Drive} of {computer.Hostname}? Only do this when someone needs to unlock the drive. "
+                + "Your name and the time are recorded in the audit log."))
+        {
+            return;
+        }
+
+        var revealed = await shell.Api.RevealRecoveryKeyAsync(computer.Id, key.Id);
+        RevealedKeyText = $"{computer.Hostname} drive {revealed.Drive}: {revealed.RecoveryPassword}";
+    });
+
+    [RelayCommand]
+    private void HideRecoveryKey() => RevealedKeyText = string.Empty;
+
     private async Task FetchAsync()
     {
         var status = StatusFilter switch
@@ -327,6 +436,7 @@ public sealed partial class ComputersViewModel(ShellViewModel shell, bool canWri
         var software = await shell.Api.ListInstalledSoftwareAsync(id, null);
         var installations = await shell.Api.ListDeploymentsAsync(1, 20, id, null);
         var exemptions = await shell.Api.ListExemptionsAsync(id);
+        var recoveryKeys = await shell.Api.ListRecoveryKeysAsync(id);
         if (Selected?.Id != id)
         {
             return; // Selection changed while loading.
@@ -349,6 +459,13 @@ public sealed partial class ComputersViewModel(ShellViewModel shell, bool canWri
         foreach (var x in exemptions)
         {
             Exemptions.Add(x);
+        }
+
+        RevealedKeyText = string.Empty;
+        RecoveryKeys.Clear();
+        foreach (var k in recoveryKeys)
+        {
+            RecoveryKeys.Add(k);
         }
 
         RecentEvents.Clear();

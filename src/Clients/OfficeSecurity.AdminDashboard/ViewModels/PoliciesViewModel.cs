@@ -6,8 +6,8 @@ using OfficeSecurity.Policy;
 namespace OfficeSecurity.AdminDashboard.ViewModels;
 
 /// <summary>
-/// Security policies: what each computer should enforce. Policies are signed and delivered to computers now;
-/// the Windows enforcement for each setting is built in Phase 5 (computers report "Not implemented" until then).
+/// Security policies: what each computer should enforce. Policies are signed and delivered to computers, which
+/// report per protection whether it is verified as applied.
 /// </summary>
 public sealed partial class PoliciesViewModel(ShellViewModel shell, bool canWrite) : SectionViewModel("Security Policies")
 {
@@ -100,7 +100,23 @@ public sealed partial class PoliciesViewModel(ShellViewModel shell, bool canWrit
     [ObservableProperty]
     public partial bool RansomwareProtection { get; set; }
 
+    /// <summary>USB drives approved by hardware ID (added from a computer's page, removed here).</summary>
+    public ObservableCollection<ApprovedDevice> ApprovedDevices { get; } = [];
+
+    [ObservableProperty]
+    public partial ApprovedDevice? SelectedApprovedDevice { get; set; }
+
     public override Task ActivateAsync() => LoadAsync();
+
+    [RelayCommand]
+    private void RemoveApprovedDevice()
+    {
+        if (SelectedApprovedDevice is { } device)
+        {
+            ApprovedDevices.Remove(device);
+            InfoMessage = $"\"{device.Description}\" will be removed when you save the policy.";
+        }
+    }
 
     [RelayCommand]
     private Task LoadAsync() => RunAsync(FetchAsync);
@@ -178,6 +194,12 @@ public sealed partial class PoliciesViewModel(ShellViewModel shell, bool canWrit
         RemovableStorageMode = s.RemovableStorage.Mode;
         BlockPortableDevices = s.RemovableStorage.BlockPortableDevices;
         BlockOpticalDrives = s.RemovableStorage.BlockOpticalDrives;
+        ApprovedDevices.Clear();
+        foreach (var d in s.RemovableStorage.ApprovedDevices)
+        {
+            ApprovedDevices.Add(d);
+        }
+
         BluetoothMode = s.Bluetooth.Mode;
         ApplicationControlMode = s.ApplicationControl.Mode;
         BlockUserWritableLocations = s.ApplicationControl.BlockUserWritableLocations;
@@ -195,11 +217,11 @@ public sealed partial class PoliciesViewModel(ShellViewModel shell, bool canWrit
         RansomwareProtection = s.FileProtection.ProtectedFolders.Any(f => f.ControlledFolderAccess);
     }
 
-    /// <summary>Settings not shown in this editor (approved devices, allow-lists, exemptions) are kept unchanged.</summary>
+    /// <summary>Settings not shown in this editor (allow-lists, exemptions) are kept unchanged.</summary>
     private PolicySettings BuildSettings() => _loaded with
     {
         Agent = _loaded.Agent with { HeartbeatIntervalSeconds = HeartbeatSeconds },
-        RemovableStorage = _loaded.RemovableStorage with { Mode = RemovableStorageMode, BlockPortableDevices = BlockPortableDevices, BlockOpticalDrives = BlockOpticalDrives },
+        RemovableStorage = _loaded.RemovableStorage with { Mode = RemovableStorageMode, BlockPortableDevices = BlockPortableDevices, BlockOpticalDrives = BlockOpticalDrives, ApprovedDevices = [.. ApprovedDevices] },
         Bluetooth = _loaded.Bluetooth with { Mode = BluetoothMode },
         ApplicationControl = _loaded.ApplicationControl with { Mode = ApplicationControlMode, BlockUserWritableLocations = BlockUserWritableLocations, AllowedFolders = Split(AllowedFolders) },
         SignInAudit = new SignInAuditSettings { RecordWindowsSignIns = RecordWindowsSignIns },

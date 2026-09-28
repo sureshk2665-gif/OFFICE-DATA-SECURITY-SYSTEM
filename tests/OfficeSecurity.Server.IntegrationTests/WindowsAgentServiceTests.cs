@@ -128,6 +128,9 @@ public sealed partial class WindowsAgentServiceTests(ITestOutputHelper output)
             // 10. Part 2: Windows sign-in records, file access records, ransomware protection, BitLocker check and
             //     Application Control (audit, then enforce, then off).
             await Part2Async(admin, defaultPolicy.Id, pending.Id);
+
+            // 11. Part 3: approved USB drives, Wi-Fi restriction, Bluetooth, and the self-check command.
+            await Part3Async(admin, defaultPolicy.Id, pending.Id, exe);
         }
         finally
         {
@@ -150,6 +153,7 @@ public sealed partial class WindowsAgentServiceTests(ITestOutputHelper output)
             Assert.Null(HklmValue(@"SOFTWARE\Policies\Microsoft\Edge\URLBlocklist", "1"));
             Assert.Null(HklmValue(@"SOFTWARE\Policies\Microsoft\Windows\Installer", "DisableMSI"));
             Assert.Null(new WindowsFirewall().Find(FirewallEnforcer.RuleName(_blockedCurl)));
+            Assert.Null(HklmValue(ApprovedDevicesEnforcer.Key, "AllowDenyLayered"));
             output.WriteLine("After uninstall: USB, website, installation and firewall settings made by the agent are gone.");
         }
     }
@@ -330,6 +334,21 @@ public sealed partial class WindowsAgentServiceTests(ITestOutputHelper output)
         Assert.Equal("exit 0", allowed);
         await WaitForEventAsync(admin, computerId, SecurityEventType.UnauthorizedApplicationBlocked, "Blocked by Application Control", "block reported");
 
+        // The policy also blocks Bluetooth file transfer (set in step 3): Windows' transfer program is denied.
+        var bluetooth = await WaitForControlsAsync(admin, computerId, "Bluetooth file transfer blocked", c => c[SecurityControl.BluetoothTransfer] == ControlState.PartiallyEnforced);
+        output.WriteLine($"  Bluetooth: {bluetooth.Controls.Single(c => c.Control == SecurityControl.BluetoothTransfer).Details}");
+        var fsquirt = Path.Combine(Environment.SystemDirectory, "fsquirt.exe");
+        if (File.Exists(fsquirt))
+        {
+            var result = TryStartAndStop(fsquirt);
+            output.WriteLine($"Bluetooth file transfer program (fsquirt.exe) → {result}");
+            Assert.StartsWith("refused", result, StringComparison.Ordinal);
+        }
+        else
+        {
+            output.WriteLine("fsquirt.exe is not present on this Windows edition; the deny rule could not be tried for real.");
+        }
+
         // The agent itself still starts under enforcement.
         await ScAsync("stop", "OfficeSecurityAgent");
         await WaitForAsync(async () => (await ScAsync("query", "OfficeSecurityAgent")).Contains("STOPPED", StringComparison.Ordinal) ? (bool?)true : null, TimeSpan.FromSeconds(60), "service stopped");
@@ -343,6 +362,97 @@ public sealed partial class WindowsAgentServiceTests(ITestOutputHelper output)
         var afterOff = await TryRunAsync(userProbe, "help");
         output.WriteLine($"After switching Application Control off: user-folder program → {afterOff}");
         Assert.Equal("exit 0", afterOff);
+    }
+
+    private async Task Part3Async(HttpClient admin, Guid policyId, Guid computerId, string exe)
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        // A made-up USB drive: the build machine has no USB drives, so this checks the Windows settings only.
+        const string disk = @"USBSTOR\DISK&VEN_OCSS&PROD_TEST_DRIVE&REV_1.00\OCSSTEST0001&0";
+        const string parent = @"USB\VID_0000&PID_0000\OCSSTEST0001";
+        await SavePolicyAsync(admin, policyId, s => s with
+        {
+            RemovableStorage = s.RemovableStorage with { Mode = EnforcementMode.Enforce, ApprovedDevices = [new ApprovedDevice(disk, "Test drive", null, parent)] },
+            Network = s.Network with { AllowedWifiNetworks = ["OCSS-Office"] },
+            Bluetooth = new BluetoothSettings { Mode = BluetoothMode.DisableRadio },
+        });
+        var detail = await WaitForControlsAsync(admin, computerId, "part 3 controls applied", c =>
+            c[SecurityControl.ApprovedDevices] == ControlState.Enforced && c[SecurityControl.RemovableStorage] == ControlState.Enforced
+            && c[SecurityControl.BluetoothTransfer] is ControlState.Enforced or ControlState.Failed
+            && c[SecurityControl.NetworkRestrictions] is not ControlState.NotConfigured and not ControlState.NotImplemented);
+        foreach (var control in detail.Controls.Where(c => c.Control is SecurityControl.ApprovedDevices or SecurityControl.RemovableStorage
+                     or SecurityControl.NetworkRestrictions or SecurityControl.BluetoothTransfer))
+        {
+            output.WriteLine($"  {control.Control}: {control.State} — {control.Details}");
+        }
+
+        // Windows device installation policy: USB storage denied except the approved drive; per-device instead of the blanket denial.
+        Assert.Equal(1, HklmValue(ApprovedDevicesEnforcer.Key, "AllowDenyLayered"));
+        Assert.Equal(1, HklmValue(ApprovedDevicesEnforcer.Key, "DenyDeviceIDs"));
+        Assert.Equal(@"USB\Class_08", HklmValue(ApprovedDevicesEnforcer.Key + @"\DenyDeviceIDs", "1"));
+        var allowedIds = new List<string?> { HklmValue(ApprovedDevicesEnforcer.Key + @"\AllowInstanceIDs", "1") as string, HklmValue(ApprovedDevicesEnforcer.Key + @"\AllowInstanceIDs", "2") as string };
+        Assert.Contains(disk, allowedIds);
+        Assert.Contains(parent, allowedIds);
+        Assert.Null(HklmValue(UsbKey, "Deny_Read"));
+        Assert.Equal(1, HklmValue(UsbKey, "Deny_Execute"));
+        output.WriteLine("Approved USB drive: Windows device installation restrictions set (USB storage denied except the approved drive); running programs from USB denied.");
+
+        // The self-check an administrator runs on a pilot PC.
+        var check = await RunWithOutputAsync(exe, "check");
+        output.WriteLine($"OfficeSecurity.Agent.exe check (exit code {check.ExitCode}):");
+        output.WriteLine(check.Output);
+        Assert.Contains("USB", check.Output, StringComparison.Ordinal);
+        Assert.Contains("Bluetooth", check.Output, StringComparison.Ordinal);
+
+        // Approvals removed: back to the blanket USB denial, device installation settings removed.
+        await SavePolicyAsync(admin, policyId, s => s with
+        {
+            RemovableStorage = s.RemovableStorage with { ApprovedDevices = [] },
+            Network = s.Network with { AllowedWifiNetworks = [] },
+            Bluetooth = new BluetoothSettings(),
+        });
+        await WaitForControlsAsync(admin, computerId, "approved drives removed", c => c[SecurityControl.ApprovedDevices] == ControlState.NotConfigured);
+        await WaitForAsync(() => Task.FromResult(HklmValue(UsbKey, "Deny_Read") is 1 && HklmValue(ApprovedDevicesEnforcer.Key, "AllowDenyLayered") is null ? (bool?)true : null),
+            TimeSpan.FromSeconds(90), "blanket USB denial back");
+        output.WriteLine("Approvals removed: all USB drives denied again; device installation settings removed.");
+    }
+
+    private static string TryStartAndStop(string exe)
+    {
+        try
+        {
+            using var process = Process.Start(new ProcessStartInfo(exe) { UseShellExecute = false })!;
+            if (process.WaitForExit(5000))
+            {
+                return $"exit {process.ExitCode}";
+            }
+
+            process.Kill();
+            return "started (NOT blocked)";
+        }
+        catch (System.ComponentModel.Win32Exception ex)
+        {
+            return $"refused by Windows: {ex.Message} ({ex.NativeErrorCode})";
+        }
+    }
+
+    private static async Task<(int ExitCode, string Output)> RunWithOutputAsync(string exe, params string[] arguments)
+    {
+        var start = new ProcessStartInfo(exe) { RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false, StandardOutputEncoding = System.Text.Encoding.UTF8 };
+        foreach (var argument in arguments)
+        {
+            start.ArgumentList.Add(argument);
+        }
+
+        using var process = Process.Start(start)!;
+        var stdout = process.StandardOutput.ReadToEndAsync();
+        var stderr = process.StandardError.ReadToEndAsync();
+        await process.WaitForExitAsync().WaitAsync(TimeSpan.FromMinutes(3));
+        return (process.ExitCode, await stdout + await stderr);
     }
 
     private async Task WaitForEventAsync(HttpClient admin, Guid computerId, SecurityEventType type, string contains, string what) =>

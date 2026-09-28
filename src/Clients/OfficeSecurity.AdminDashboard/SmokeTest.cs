@@ -10,6 +10,7 @@ using OfficeSecurity.Client.Core;
 using OfficeSecurity.Client.Core.ViewModels;
 using OfficeSecurity.Client.Wpf;
 using OfficeSecurity.Contracts;
+using OfficeSecurity.Policy;
 
 namespace OfficeSecurity.AdminDashboard;
 
@@ -93,7 +94,7 @@ internal static class SmokeTest
             [new StaffReference(Guid.NewGuid(), "EMP001", "Sample")], null, "192.168.1.5", "ab", DateTimeOffset.UtcNow.AddYears(2));
         Check("Computers with details and install instructions", () =>
         {
-            var computers = new ComputersViewModel(shell, canWrite: true);
+            var computers = new ComputersViewModel(shell, canWrite: true, canRevealKeys: true);
             computers.ShowSampleForSelfTest(detail, new EnrollmentCodeResponse("ABCD-EFGH-JKMN", DateTimeOffset.UtcNow.AddDays(1), "1234-5678-9ABC-DEF0-1234"));
             return computers;
         });
@@ -113,6 +114,7 @@ internal static class SmokeTest
         {
             var policies = new PoliciesViewModel(shell, canWrite: true);
             policies.NewCommand.Execute(null);
+            policies.ApprovedDevices.Add(new ApprovedDevice(@"USBSTOR\DISK", "Accounts backup drive", DateTimeOffset.UtcNow.AddDays(30), @"USB\VID_0781"));
             return policies;
         });
 

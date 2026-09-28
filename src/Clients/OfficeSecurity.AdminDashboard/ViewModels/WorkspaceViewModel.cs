@@ -41,7 +41,7 @@ public sealed partial class WorkspaceViewModel : ObservableObject
         var sections = new List<SectionViewModel>
         {
             new OverviewViewModel(shell),
-            new ComputersViewModel(shell, canWrite),
+            new ComputersViewModel(shell, canWrite, canRevealKeys: user.Role == AdminRoles.SuperAdmin),
             new StaffViewModel(shell, canWrite),
         };
         if (user.Role == AdminRoles.SuperAdmin)
