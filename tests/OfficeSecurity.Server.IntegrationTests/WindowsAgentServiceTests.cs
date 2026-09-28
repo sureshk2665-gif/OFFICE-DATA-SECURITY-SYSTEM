@@ -278,7 +278,8 @@ public sealed partial class WindowsAgentServiceTests(ITestOutputHelper output)
         File.Copy(agentExe, userProbe);
         var installedProbe = Path.Combine(Directory.CreateDirectory(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "OcssProbe")).FullName, "probe.exe");
         File.Copy(agentExe, installedProbe, overwrite: true);
-        var password = "Ocss-" + Guid.NewGuid().ToString("N")[..12] + "!9";
+        // At most 14 characters, otherwise "net user" stops to ask about pre-Windows 2000 compatibility.
+        var password = "Oc-" + Guid.NewGuid().ToString("N")[..8] + "!9";
         Assert.Equal(0, await RunAsync("net.exe", "user", TestUser, password, "/add"));
 
         // Folders this CI machine needs while Application Control is enforced (the test program and the build runner).
