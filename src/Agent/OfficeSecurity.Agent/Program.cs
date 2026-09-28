@@ -49,7 +49,15 @@ static void RunAgent(string[] args)
     {
         AgentVersion = typeof(AgentWorker).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion?.Split('+')[0] ?? "0.0.0",
     });
-    builder.Services.AddSingleton<AgentRuntime>();
+    builder.Services.AddSingleton<IInstallerVerifier, AuthenticodeInstallerVerifier>();
+    builder.Services.AddSingleton<IInstallerRunner>(new ProcessInstallerRunner());
+    builder.Services.AddSingleton(sp => new InstallationProcessor(paths, sp.GetRequiredService<IInstallerVerifier>(), sp.GetRequiredService<IInstallerRunner>(),
+        sp.GetRequiredService<PendingEventStore>(), sp.GetRequiredService<ILogger<InstallationProcessor>>()));
+    builder.Services.AddSingleton(sp => new AgentRuntime(
+        sp.GetRequiredService<AgentConfigStore>(), sp.GetRequiredService<IDeviceKeyStore>(), sp.GetRequiredService<IInventoryCollector>(),
+        sp.GetRequiredService<EnforcementCoordinator>(), sp.GetRequiredService<PendingEventStore>(), sp.GetRequiredService<PolicyCache>(),
+        sp.GetRequiredService<TimeProvider>(), sp.GetRequiredService<ILogger<AgentRuntime>>(), sp.GetRequiredService<AgentRuntimeOptions>(),
+        clientFactory: null, installations: sp.GetRequiredService<InstallationProcessor>()));
     builder.Services.AddSingleton<AgentLocalServer>(sp => new AgentLocalServer(sp.GetRequiredService<AgentRuntime>(), sp.GetRequiredService<ILogger<AgentLocalServer>>()));
     builder.Services.AddHostedService<AgentWorker>();
 

@@ -87,6 +87,53 @@ public sealed class AgentServerClient : IDisposable
     public Task<AgentEventsResponse> SendEventsAsync(AgentEventsRequest request, CancellationToken ct) =>
         SendAsync<AgentEventsResponse>(HttpMethod.Post, ApiRoutes.AgentEvents, request, ct);
 
+    public Task<List<AgentJob>> GetJobsAsync(CancellationToken ct) =>
+        SendAsync<List<AgentJob>>(HttpMethod.Get, ApiRoutes.AgentJobs, null, ct);
+
+    public Task StartJobAsync(Guid jobId, CancellationToken ct) =>
+        SendAsync<object>(HttpMethod.Post, ApiRoutes.AgentJobStart(jobId), null, ct);
+
+    public Task SendJobResultAsync(Guid jobId, AgentJobResult result, CancellationToken ct) =>
+        SendAsync<object>(HttpMethod.Post, ApiRoutes.AgentJobResult(jobId), result, ct);
+
+    /// <summary>Downloads a job's installer into <paramref name="destination"/>, refusing more than <paramref name="maxBytes"/>.</summary>
+    public async Task DownloadPackageAsync(Guid jobId, Stream destination, long maxBytes, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(destination);
+        HttpResponseMessage response;
+        try
+        {
+            response = await _http.GetAsync(new Uri(ApiRoutes.AgentJobPackage(jobId), UriKind.Relative), HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
+        }
+        catch (HttpRequestException ex)
+        {
+            throw new AgentServerException("Server unreachable: " + ex.Message, null, ex);
+        }
+
+        using (response)
+        {
+            if (!response.IsSuccessStatusCode)
+            {
+                throw new AgentServerException($"Installer download refused ({(int)response.StatusCode}).", response.StatusCode);
+            }
+
+            await using var body = await response.Content.ReadAsStreamAsync(ct).ConfigureAwait(false);
+            var buffer = new byte[81920];
+            long total = 0;
+            int read;
+            while ((read = await body.ReadAsync(buffer, ct).ConfigureAwait(false)) > 0)
+            {
+                total += read;
+                if (total > maxBytes)
+                {
+                    throw new InvalidDataException("The downloaded installer is larger than expected.");
+                }
+
+                await destination.WriteAsync(buffer.AsMemory(0, read), ct).ConfigureAwait(false);
+            }
+        }
+    }
+
     public Task<ComputerLoginTicketResponse> GetLoginTicketAsync(CancellationToken ct) =>
         SendAsync<ComputerLoginTicketResponse>(HttpMethod.Post, ApiRoutes.AgentLoginTicket, null, ct);
 

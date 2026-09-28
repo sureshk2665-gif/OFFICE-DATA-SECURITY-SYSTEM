@@ -64,6 +64,60 @@ internal sealed class WindowsInventoryCollector : IInventoryCollector
     }
 
     /// <summary>Property values of the first result, copied out before the WMI objects are released.</summary>
+    /// <summary>
+    /// Programs from the registry "Uninstall" keys that feed Windows "Installed apps": machine-wide (64- and
+    /// 32-bit) and, for users whose profile is loaded, per-user installations. Updates and system components are skipped.
+    /// </summary>
+    public IReadOnlyList<InstalledSoftware> CollectSoftware()
+    {
+        const string UninstallKey = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall";
+        var result = new List<InstalledSoftware>();
+        foreach (var view in new[] { RegistryView.Registry64, RegistryView.Registry32 })
+        {
+            using var hklm = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, view);
+            Read(hklm.OpenSubKey(UninstallKey), "Machine", result);
+        }
+
+        using (var users = RegistryKey.OpenBaseKey(RegistryHive.Users, RegistryView.Default))
+        {
+            foreach (var sid in users.GetSubKeyNames().Where(n => n.StartsWith("S-1-5-21-", StringComparison.Ordinal) && !n.EndsWith("_Classes", StringComparison.Ordinal)))
+            {
+                Read(users.OpenSubKey(sid + "\\" + UninstallKey), "User", result);
+            }
+        }
+
+        return result
+            .GroupBy(s => (s.Name.ToUpperInvariant(), s.Version, s.Scope))
+            .Select(g => g.First())
+            .ToList();
+    }
+
+    private static void Read(RegistryKey? uninstall, string scope, List<InstalledSoftware> into)
+    {
+        using (uninstall)
+        {
+            if (uninstall is null)
+            {
+                return;
+            }
+
+            foreach (var name in uninstall.GetSubKeyNames())
+            {
+                using var entry = uninstall.OpenSubKey(name);
+                if (entry?.GetValue("DisplayName") is not string displayName || string.IsNullOrWhiteSpace(displayName) ||
+                    entry.GetValue("SystemComponent") is 1 || entry.GetValue("ParentKeyName") is not null ||
+                    entry.GetValue("ReleaseType") is "Update" or "Hotfix" or "Security Update")
+                {
+                    continue;
+                }
+
+                DateOnly? installed = entry.GetValue("InstallDate") is string date &&
+                    DateOnly.TryParseExact(date, "yyyyMMdd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsed) ? parsed : null;
+                into.Add(new InstalledSoftware(displayName.Trim(), (entry.GetValue("DisplayVersion") as string)?.Trim(), (entry.GetValue("Publisher") as string)?.Trim(), installed, scope));
+            }
+        }
+    }
+
     private static Dictionary<string, object?>? First(string query, string scope = @"root\cimv2")
     {
         try

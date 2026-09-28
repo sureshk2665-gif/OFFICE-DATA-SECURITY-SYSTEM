@@ -28,6 +28,16 @@ public sealed class ServerDbContext(DbContextOptions<ServerDbContext> options) :
 
     public DbSet<StaffComputerAssignment> StaffAssignments => Set<StaffComputerAssignment>();
 
+    public DbSet<SoftwareInventoryItem> InstalledSoftware => Set<SoftwareInventoryItem>();
+
+    public DbSet<ApprovedSoftware> ApprovedSoftware => Set<ApprovedSoftware>();
+
+    public DbSet<SoftwarePackage> SoftwarePackages => Set<SoftwarePackage>();
+
+    public DbSet<SoftwareRequest> SoftwareRequests => Set<SoftwareRequest>();
+
+    public DbSet<DeploymentJob> DeploymentJobs => Set<DeploymentJob>();
+
     protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
     {
         ArgumentNullException.ThrowIfNull(configurationBuilder);
@@ -43,6 +53,8 @@ public sealed class ServerDbContext(DbContextOptions<ServerDbContext> options) :
         configurationBuilder.Properties<AuditActorType>().HaveConversion<string>().HaveMaxLength(16);
         configurationBuilder.Properties<AuditOutcome>().HaveConversion<string>().HaveMaxLength(16);
         configurationBuilder.Properties<ComputerStatus>().HaveConversion<string>().HaveMaxLength(32);
+        configurationBuilder.Properties<SoftwareRequestStatus>().HaveConversion<string>().HaveMaxLength(32);
+        configurationBuilder.Properties<DeploymentStatus>().HaveConversion<string>().HaveMaxLength(32);
     }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -176,6 +188,64 @@ public sealed class ServerDbContext(DbContextOptions<ServerDbContext> options) :
             e.HasIndex(p => p.Name).IsUnique();
             e.Property(p => p.Description).HasMaxLength(500);
             e.Property(p => p.SettingsJson).HasMaxLength(64000).IsRequired();
+        });
+
+        modelBuilder.Entity<SoftwareInventoryItem>(e =>
+        {
+            e.ToTable("software_inventory");
+            e.HasKey(i => i.Id);
+            e.Property(i => i.Id).ValueGeneratedOnAdd();
+            e.Property(i => i.Name).HasMaxLength(256).IsRequired();
+            e.Property(i => i.Version).HasMaxLength(64).IsRequired();
+            e.Property(i => i.Publisher).HasMaxLength(256);
+            e.Property(i => i.Scope).HasMaxLength(16).IsRequired();
+            e.HasIndex(i => new { i.ComputerId, i.Name, i.Version, i.Scope }).IsUnique();
+            e.HasIndex(i => i.Name);
+            e.HasOne<Computer>().WithMany().HasForeignKey(i => i.ComputerId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<ApprovedSoftware>(e =>
+        {
+            e.ToTable("approved_software");
+            e.HasKey(a => a.Id);
+            e.Property(a => a.Name).HasMaxLength(256).IsRequired();
+            e.Property(a => a.Publisher).HasMaxLength(256);
+            e.Property(a => a.Notes).HasMaxLength(1000);
+            e.HasIndex(a => a.Name).IsUnique();
+        });
+
+        modelBuilder.Entity<SoftwarePackage>(e =>
+        {
+            e.ToTable("software_packages");
+            e.HasKey(p => p.Id);
+            e.Property(p => p.FileName).HasMaxLength(260).IsRequired();
+            e.Property(p => p.Sha256).HasMaxLength(64).IsRequired();
+            e.Property(p => p.InstallerType).HasMaxLength(8).IsRequired();
+            e.Property(p => p.SilentArguments).HasMaxLength(512);
+            e.Property(p => p.SignerSubject).HasMaxLength(512);
+            e.HasOne<ApprovedSoftware>().WithMany().HasForeignKey(p => p.ApprovedSoftwareId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<SoftwareRequest>(e =>
+        {
+            e.ToTable("software_requests");
+            e.HasKey(r => r.Id);
+            e.Property(r => r.SoftwareName).HasMaxLength(200).IsRequired();
+            e.Property(r => r.Reason).HasMaxLength(1000).IsRequired();
+            e.Property(r => r.ReviewNote).HasMaxLength(1000);
+            e.HasIndex(r => new { r.Status, r.CreatedAtUtc });
+            e.HasIndex(r => r.StaffId);
+            e.HasOne<StaffAccount>().WithMany().HasForeignKey(r => r.StaffId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<DeploymentJob>(e =>
+        {
+            e.ToTable("deployment_jobs");
+            e.HasKey(j => j.Id);
+            e.Property(j => j.Message).HasMaxLength(2000);
+            e.HasIndex(j => new { j.ComputerId, j.Status });
+            e.HasOne<SoftwarePackage>().WithMany().HasForeignKey(j => j.PackageId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<Computer>().WithMany().HasForeignKey(j => j.ComputerId).OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<StaffComputerAssignment>(e =>

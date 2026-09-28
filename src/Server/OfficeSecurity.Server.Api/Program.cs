@@ -77,6 +77,8 @@ builder.Services.AddScoped<AccountAdministration>();
 builder.Services.AddScoped<PolicyService>();
 builder.Services.AddScoped<ComputerAdministration>();
 builder.Services.AddScoped<AgentService>();
+builder.Services.AddScoped<SoftwareService>();
+builder.Services.AddSingleton<IPackageStorage>(new FilePackageStorage(paths.PackagesDirectory));
 
 builder.Services.AddAuthentication(SessionAuthenticationHandler.SchemeName)
     .AddScheme<AuthenticationSchemeOptions, SessionAuthenticationHandler>(SessionAuthenticationHandler.SchemeName, null)
@@ -119,6 +121,7 @@ app.MapGet(ApiRoutes.CaCertificate, (ServerCertificates certs) => TypedResults.B
 app.MapAuthEndpoints();
 app.MapAdministrationEndpoints();
 app.MapComputerEndpoints();
+app.MapSoftwareEndpoints();
 
 await ServerStartup.InitializeAsync(app, certificates, httpsPort);
 await app.RunAsync();

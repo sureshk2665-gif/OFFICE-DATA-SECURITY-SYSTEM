@@ -16,6 +16,10 @@ public sealed class TestInventory : IInventoryCollector
         new(ComputerName, "Microsoft Windows 11 Pro", "24H2", "26100.4061", "Professional", "Contoso", "OfficeBook 5", "SN-1234", "Test CPU", 16384, 476, true, false, "WORKGROUP");
 
     public IReadOnlyList<ConnectedDevice> CollectDevices() => [.. Devices];
+
+    public List<InstalledSoftware> Software { get; } = [];
+
+    public IReadOnlyList<InstalledSoftware> CollectSoftware() => [.. Software];
 }
 
 /// <summary>

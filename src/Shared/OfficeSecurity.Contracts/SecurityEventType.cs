@@ -26,4 +26,6 @@ public enum SecurityEventType
     AgentStarted = 19,
     DeviceConnected = 20,
     DeviceDisconnected = 21,
+    SoftwareRemoved = 22,
+    SoftwareDeployment = 23,
 }

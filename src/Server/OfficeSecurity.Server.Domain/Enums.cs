@@ -56,3 +56,20 @@ public enum ComputerStatus
     /// <summary>Removed from management; its certificate is no longer accepted.</summary>
     Retired,
 }
+
+public enum SoftwareRequestStatus
+{
+    Pending,
+    Approved,
+    Rejected,
+}
+
+public enum DeploymentStatus
+{
+    Queued,
+    Running,
+    Succeeded,
+    SucceededRebootRequired,
+    Failed,
+    Cancelled,
+}

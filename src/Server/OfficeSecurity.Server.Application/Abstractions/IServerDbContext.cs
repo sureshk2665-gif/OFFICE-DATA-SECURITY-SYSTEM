@@ -27,5 +27,15 @@ public interface IServerDbContext
 
     DbSet<StaffComputerAssignment> StaffAssignments { get; }
 
+    DbSet<SoftwareInventoryItem> InstalledSoftware { get; }
+
+    DbSet<ApprovedSoftware> ApprovedSoftware { get; }
+
+    DbSet<SoftwarePackage> SoftwarePackages { get; }
+
+    DbSet<SoftwareRequest> SoftwareRequests { get; }
+
+    DbSet<DeploymentJob> DeploymentJobs { get; }
+
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

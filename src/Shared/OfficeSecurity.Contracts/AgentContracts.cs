@@ -43,9 +43,45 @@ public sealed record ConnectedDevice(string InstanceId, string Name, string Devi
 
 public sealed record AgentHeartbeatRequest(string AgentVersion, long AppliedPolicyVersion, IReadOnlyList<ControlStatus> Controls, int QueuedEvents);
 
-public sealed record AgentHeartbeatResponse(long LatestPolicyVersion, int HeartbeatIntervalSeconds);
+/// <param name="PendingJobs">Number of approved software installations waiting for this computer.</param>
+public sealed record AgentHeartbeatResponse(long LatestPolicyVersion, int HeartbeatIntervalSeconds, int PendingJobs = 0);
 
-public sealed record AgentInventoryRequest(HardwareInventory Hardware, IReadOnlyList<ConnectedDevice> Devices);
+/// <param name="Software">Installed programs; null when the agent did not collect them in this report.</param>
+public sealed record AgentInventoryRequest(HardwareInventory Hardware, IReadOnlyList<ConnectedDevice> Devices, IReadOnlyList<InstalledSoftware>? Software = null);
+
+/// <param name="Scope">"Machine" (all users) or "User" (installed for one user only).</param>
+public sealed record InstalledSoftware(string Name, string? Version, string? Publisher, DateOnly? InstallDate, string Scope);
+
+public static class InstallerTypes
+{
+    public const string Msi = "Msi";
+    public const string Exe = "Exe";
+}
+
+/// <summary>An approved installation the agent must perform. The agent verifies the file before running it.</summary>
+public sealed record AgentJob(
+    Guid JobId,
+    string SoftwareName,
+    string FileName,
+    string Sha256,
+    long SizeBytes,
+    string InstallerType,
+    string? SilentArguments,
+    string? SignerSubject,
+    bool AllowUnsigned);
+
+public static class JobStatuses
+{
+    public const string Queued = "Queued";
+    public const string Running = "Running";
+    public const string Succeeded = "Succeeded";
+    public const string SucceededRebootRequired = "SucceededRebootRequired";
+    public const string Failed = "Failed";
+    public const string Cancelled = "Cancelled";
+}
+
+/// <param name="Status">Succeeded, SucceededRebootRequired or Failed.</param>
+public sealed record AgentJobResult(string Status, int? ExitCode, string? Message);
 
 public static class EventSeverities
 {

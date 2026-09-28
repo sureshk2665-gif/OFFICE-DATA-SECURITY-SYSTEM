@@ -177,7 +177,7 @@ internal static class Commands
     public static int Inventory()
     {
         var collector = new WindowsInventoryCollector();
-        Console.WriteLine(JsonSerializer.Serialize(new { hardware = collector.CollectHardware(), devices = collector.CollectDevices() }, PrettyJson));
+        Console.WriteLine(JsonSerializer.Serialize(new { hardware = collector.CollectHardware(), devices = collector.CollectDevices(), software = collector.CollectSoftware() }, PrettyJson));
         return 0;
     }
 

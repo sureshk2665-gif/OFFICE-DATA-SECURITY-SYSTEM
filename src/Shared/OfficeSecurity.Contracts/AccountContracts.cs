@@ -63,4 +63,6 @@ public sealed record DashboardOverviewResponse(
     int ComputersOnline,
     int ComputersOffline,
     int ComputersPendingApproval,
-    int ComputersWithFailedControls);
+    int ComputersWithFailedControls,
+    int PendingSoftwareRequests,
+    int ComputersWithUnapprovedSoftware);

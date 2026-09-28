@@ -19,6 +19,7 @@ public sealed class AgentService(
     IDeviceCertificateAuthority certificateAuthority,
     IPolicySigningService policySigner,
     PolicyService policies,
+    SoftwareService software,
     OneTimeTicketStore<ComputerLoginTicket> loginTickets,
     TimeProvider clock)
 {
@@ -121,7 +122,8 @@ public sealed class AgentService(
         computer.HeartbeatIntervalSeconds = settings.Agent.HeartbeatIntervalSeconds;
         await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
 
-        return new AgentHeartbeatResponse(computer.PolicyVersion, computer.HeartbeatIntervalSeconds);
+        return new AgentHeartbeatResponse(computer.PolicyVersion, computer.HeartbeatIntervalSeconds,
+            await software.CountPendingJobsAsync(computerId, cancellationToken).ConfigureAwait(false));
     }
 
     public async Task<SignedPolicyEnvelope> GetPolicyAsync(Guid computerId, CancellationToken cancellationToken = default)
@@ -182,6 +184,11 @@ public sealed class AgentService(
         }
 
         await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        if (request.Software is { } installed)
+        {
+            await software.ApplyInventoryAsync(computerId, installed, cancellationToken).ConfigureAwait(false);
+        }
+
         return Done.Value;
     }
 

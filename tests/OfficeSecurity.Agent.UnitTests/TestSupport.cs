@@ -147,6 +147,10 @@ public sealed class FakeInventory : IInventoryCollector
     public HardwareInventory CollectHardware() => new("TEST-PC", "Windows 11 Pro", "24H2", "26100.1", "Professional", "Contoso", "Model 1", "SN1", "CPU", 16384, 256, true, false, "WORKGROUP");
 
     public IReadOnlyList<ConnectedDevice> CollectDevices() => [.. Devices];
+
+    public List<InstalledSoftware> Software { get; } = [];
+
+    public IReadOnlyList<InstalledSoftware> CollectSoftware() => [.. Software];
 }
 
 /// <summary>An agent runtime wired to a fake server, with its own data folder and clock.</summary>

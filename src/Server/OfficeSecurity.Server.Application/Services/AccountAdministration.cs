@@ -318,9 +318,19 @@ public sealed class AccountAdministration(
         var trusted = computers.Where(c => c.Status == ComputerStatus.Trusted).ToList();
         var online = trusted.Count(c => ComputerPresence.IsOnline(c.LastSeenAtUtc, c.HeartbeatIntervalSeconds, now));
 
+        var pendingRequests = await db.SoftwareRequests.CountAsync(r => r.Status == SoftwareRequestStatus.Pending, cancellationToken).ConfigureAwait(false);
+        var approved = await db.ApprovedSoftware.AsNoTracking().ToListAsync(cancellationToken).ConfigureAwait(false);
+        var installed = await (from i in db.InstalledSoftware.AsNoTracking()
+                               join c in db.Computers.AsNoTracking() on i.ComputerId equals c.Id
+                               where i.IsPresent && c.Status == ComputerStatus.Trusted
+                               select new { i.ComputerId, i.Name, i.Publisher })
+            .Distinct().ToListAsync(cancellationToken).ConfigureAwait(false);
+        var withUnapproved = installed.Where(i => !approved.Any(a => a.Matches(i.Name, i.Publisher))).Select(i => i.ComputerId).Distinct().Count();
+
         return new DashboardOverviewResponse(
             counts.Sum(c => c.Count), Count(AccountStatus.Active), Count(AccountStatus.PendingActivation), Count(AccountStatus.Disabled), admins, failedLogins,
-            trusted.Count, online, trusted.Count - online, computers.Count(c => c.Status == ComputerStatus.PendingApproval), trusted.Count(c => c.FailedControls > 0));
+            trusted.Count, online, trusted.Count - online, computers.Count(c => c.Status == ComputerStatus.PendingApproval), trusted.Count(c => c.FailedControls > 0),
+            pendingRequests, withUnapproved);
     }
 
     // ---------------------------------------------------------------- helpers

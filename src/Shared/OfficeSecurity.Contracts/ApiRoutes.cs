@@ -40,6 +40,25 @@ public static class ApiRoutes
     public const string AgentEvents = Prefix + "/agent/events";
     public const string AgentInventory = Prefix + "/agent/inventory";
     public const string AgentLoginTicket = Prefix + "/agent/login-ticket";
+    public const string AgentJobs = Prefix + "/agent/jobs";
+
+    public const string SoftwareRequests = Prefix + "/software-requests";
+    public const string MySoftwareRequests = SoftwareRequests + "/mine";
+    public const string ApprovedSoftware = Prefix + "/software/approved";
+    public const string SoftwarePackages = Prefix + "/software/packages";
+    public const string SoftwareDeployments = Prefix + "/software/deployments";
+    public const string SoftwareInventory = Prefix + "/software/inventory";
+    public const string SoftwareInventoryComputers = SoftwareInventory + "/computers";
+
+    public static string AgentJobStart(Guid id) => $"{AgentJobs}/{id}/start";
+    public static string AgentJobPackage(Guid id) => $"{AgentJobs}/{id}/package";
+    public static string AgentJobResult(Guid id) => $"{AgentJobs}/{id}/result";
+    public static string SoftwareRequestApprove(Guid id) => $"{SoftwareRequests}/{id}/approve";
+    public static string SoftwareRequestReject(Guid id) => $"{SoftwareRequests}/{id}/reject";
+    public static string ApprovedSoftwareById(Guid id) => $"{ApprovedSoftware}/{id}";
+    public static string ApprovedSoftwarePackages(Guid id) => $"{ApprovedSoftware}/{id}/packages";
+    public static string SoftwarePackageById(Guid id) => $"{SoftwarePackages}/{id}";
+    public static string DeploymentCancel(Guid id) => $"{SoftwareDeployments}/{id}/cancel";
 
     public static string ComputerById(Guid id) => $"{Computers}/{id}";
     public static string ComputerApprove(Guid id) => $"{Computers}/{id}/approve";

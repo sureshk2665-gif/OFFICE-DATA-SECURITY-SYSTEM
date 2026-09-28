@@ -26,6 +26,9 @@ public sealed class AgentRuntimeOptions
     public TimeSpan ApprovalFastPeriod { get; init; } = TimeSpan.FromMinutes(10);
 
     public int EventUploadBatchSize { get; init; } = 200;
+
+    /// <summary>Tests run installations inside <see cref="AgentRuntime.RunOnceAsync"/>; the service runs them in the background.</summary>
+    public bool RunInstallationsInline { get; init; }
 }
 
 /// <summary>
@@ -45,6 +48,8 @@ public sealed partial class AgentRuntime : IDisposable
     private readonly AgentRuntimeOptions _options;
     private readonly Func<AgentConfig, AgentServerClient>? _clientFactory;
     private readonly Lock _clientGate = new();
+    private readonly InstallationProcessor? _installations;
+    private Task? _installationTask;
 
     private AgentServerClient? _client;
     private string? _clientKey;
@@ -66,8 +71,10 @@ public sealed partial class AgentRuntime : IDisposable
         TimeProvider clock,
         ILogger<AgentRuntime> logger,
         AgentRuntimeOptions options,
-        Func<AgentConfig, AgentServerClient>? clientFactory = null)
+        Func<AgentConfig, AgentServerClient>? clientFactory = null,
+        InstallationProcessor? installations = null)
     {
+        _installations = installations;
         _configStore = configStore;
         _keys = keys;
         _inventory = inventory;
@@ -294,11 +301,24 @@ public sealed partial class AgentRuntime : IDisposable
 
             _nextHeartbeat = now + TimeSpan.FromSeconds(Math.Clamp(response.HeartbeatIntervalSeconds, PolicyDocumentValidator.MinHeartbeatSeconds, PolicyDocumentValidator.MaxHeartbeatSeconds));
             _configStore.Save(_configStore.Load() with { LastContactUtc = now, LastError = null });
+
+            if (response.PendingJobs > 0 && _installations is not null && _installationTask is not { IsCompleted: false })
+            {
+                if (_options.RunInstallationsInline)
+                {
+                    await RunInstallationsAsync(client, cancellationToken).ConfigureAwait(false);
+                }
+                else
+                {
+                    // Installations can take many minutes; heartbeats and policy updates continue meanwhile.
+                    _installationTask = Task.Run(() => RunInstallationsAsync(client, cancellationToken), cancellationToken);
+                }
+            }
         }
 
         if (now >= _nextInventory)
         {
-            await client.SendInventoryAsync(new AgentInventoryRequest(_inventory.CollectHardware(), devices), cancellationToken).ConfigureAwait(false);
+            await client.SendInventoryAsync(new AgentInventoryRequest(_inventory.CollectHardware(), devices, _inventory.CollectSoftware()), cancellationToken).ConfigureAwait(false);
             _nextInventory = now + _options.InventoryInterval;
         }
 
@@ -312,6 +332,27 @@ public sealed partial class AgentRuntime : IDisposable
         var untilHeartbeat = _nextHeartbeat - _clock.GetUtcNow();
         return untilHeartbeat < _options.DevicePollInterval ? (untilHeartbeat > TimeSpan.Zero ? untilHeartbeat : TimeSpan.FromSeconds(1)) : _options.DevicePollInterval;
     }
+
+    private async Task RunInstallationsAsync(AgentServerClient client, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await _installations!.ProcessAsync(client, cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is AgentServerException or IOException or UnauthorizedAccessException or InvalidOperationException or System.ComponentModel.Win32Exception)
+        {
+            // The job stays "Running" on the server and is retried at a later heartbeat (up to 3 attempts).
+            LogInstallationError(_logger, ex.Message);
+        }
+        finally
+        {
+            // Report the new software list promptly.
+            _nextInventory = _clock.GetUtcNow();
+        }
+    }
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Installation interrupted; it will be retried: {Message}")]
+    private static partial void LogInstallationError(ILogger logger, string message);
 
     private async Task UpdatePolicyAsync(AgentServerClient client, AgentConfig config, long announcedVersion, CancellationToken cancellationToken)
     {
