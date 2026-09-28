@@ -336,7 +336,8 @@ public sealed partial class WindowsAgentServiceTests(ITestOutputHelper output)
         output.WriteLine($"Application Control enforced: user-folder program → {blocked}; Program Files program → {allowed}");
         Assert.NotEqual("exit 0", blocked);
         Assert.Equal("exit 0", allowed);
-        await WaitForEventAsync(admin, computerId, SecurityEventType.UnauthorizedApplicationBlocked, "Blocked by Application Control", "block reported");
+        // The block itself must be reported (not the audit-mode "would be blocked" report from before).
+        _blockReported = await BlockReportedAsync(admin, computerId);
 
         // The policy also blocks Bluetooth file transfer (set in step 3): Windows' transfer program is denied.
         var bluetooth = await WaitForControlsAsync(admin, computerId, "Bluetooth file transfer blocked", c => c[SecurityControl.BluetoothTransfer] == ControlState.PartiallyEnforced);
@@ -442,7 +443,10 @@ public sealed partial class WindowsAgentServiceTests(ITestOutputHelper output)
         // The tampering in step 8, the program blocked in part 2, and the service stopped with "sc stop" in part 2
         // (the real service sent its stop notice through the Windows service control manager).
         Assert.Contains(alerts, a => a.RuleCode == "tamper" && a.ComputerId == computerId && a.EventCount >= 2);
-        Assert.Contains(alerts, a => a.RuleCode == "program-blocked" && a.ComputerId == computerId);
+        if (_blockReported)
+        {
+            Assert.Contains(alerts, a => a.RuleCode == "program-blocked" && a.ComputerId == computerId);
+        }
         var stopped = Assert.Single(alerts, a => a.RuleCode == "agent-stopped" && a.ComputerId == computerId);
         Assert.Contains("stopped while Windows kept running", stopped.Details, StringComparison.Ordinal);
         Assert.DoesNotContain(alerts, a => a.RuleCode == "computer-not-reporting");
@@ -468,6 +472,8 @@ public sealed partial class WindowsAgentServiceTests(ITestOutputHelper output)
                 Assert.StartsWith("%PDF", System.Text.Encoding.Latin1.GetString(content, 0, 4), StringComparison.Ordinal);
             }
         }
+
+        Assert.True(_blockReported, "The program blocked by Application Control was not reported to the server (see the Code Integrity events above).");
     }
 
     private static string TryStartAndStop(string exe)
@@ -502,6 +508,46 @@ public sealed partial class WindowsAgentServiceTests(ITestOutputHelper output)
         var stderr = process.StandardError.ReadToEndAsync();
         await process.WaitForExitAsync().WaitAsync(TimeSpan.FromMinutes(3));
         return (process.ExitCode, await stdout + await stderr);
+    }
+
+    private bool _blockReported;
+
+    /// <summary>
+    /// Waits for the "Blocked by Application Control" event. If it does not arrive, prints what Windows logged in
+    /// the Code Integrity log so the cause is visible, and lets the rest of the test run (it fails at the end).
+    /// </summary>
+    private async Task<bool> BlockReportedAsync(HttpClient admin, Guid computerId)
+    {
+        var watch = Stopwatch.StartNew();
+        while (watch.Elapsed < TimeSpan.FromSeconds(120))
+        {
+            var e = await admin.GetFromJsonAsync<PagedResult<SecurityEventResponse>>(
+                $"{ApiRoutes.Events}?computerId={computerId}&type={nameof(SecurityEventType.UnauthorizedApplicationBlocked)}&pageSize=200");
+            if (e!.Items.FirstOrDefault(x => x.Details!.StartsWith("Blocked by Application Control:", StringComparison.Ordinal)) is { } match)
+            {
+                output.WriteLine($"  event {match.EventType} ({match.Severity}): {match.Details}  [after {watch.Elapsed.TotalSeconds:0} s]");
+                return true;
+            }
+
+            await Task.Delay(TimeSpan.FromSeconds(3));
+        }
+
+        output.WriteLine("PROBLEM: the block was not reported within 120 s. Code Integrity events on this machine (newest first):");
+        if (OperatingSystem.IsWindows())
+        {
+            using var reader = new System.Diagnostics.Eventing.Reader.EventLogReader(new System.Diagnostics.Eventing.Reader.EventLogQuery(
+                "Microsoft-Windows-CodeIntegrity/Operational", System.Diagnostics.Eventing.Reader.PathType.LogName) { ReverseDirection = true });
+            for (var (record, n) = (reader.ReadEvent(), 0); record is not null && n < 12; record = reader.ReadEvent(), n++)
+            {
+                using (record)
+                {
+                    output.WriteLine($"  --- event {record.Id} #{record.RecordId} {record.TimeCreated:HH:mm:ss}");
+                    output.WriteLine("  " + record.ToXml());
+                }
+            }
+        }
+
+        return false;
     }
 
     private async Task WaitForEventAsync(HttpClient admin, Guid computerId, SecurityEventType type, string contains, string what) =>
