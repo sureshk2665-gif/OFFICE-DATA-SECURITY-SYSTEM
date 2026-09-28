@@ -1,4 +1,4 @@
-# Database schema (Phases 2–3)
+# Database schema (Phases 2–4)
 
 ## Storage
 
@@ -22,6 +22,11 @@
 | `security_events` | Events uploaded by agents | Unique (`ComputerId`, `EventId`) for idempotent uploads; indexes by computer/time and type/time |
 | `policies` | Named policies; `SettingsJson` holds `PolicySettings`; one `IsDefault` | Unique `Name` |
 | `staff_computer_assignments` | Which staff may sign in on which computers | PK (`StaffId`, `ComputerId`) |
+| `software_inventory` | Programs reported per computer (name, version, publisher, scope Machine/User, install date), first/last seen, present flag | Unique (`ComputerId`, `Name`, `Version`, `Scope`); index `Name` |
+| `approved_software` | Approved programs: name prefix, optional publisher, notes | Unique `Name` |
+| `software_packages` | Uploaded installer files: file name, type (Msi/Exe), SHA-256, size, silent options, required signer, unsigned allowed; the file itself is `packages\{id}.pkg` in the data folder | FK `ApprovedSoftwareId` (restrict) |
+| `software_requests` | Staff requests: program, reason, computer (from the sign-in ticket), status, reviewer, note, resulting installation | Indexes on (`Status`, `CreatedAtUtc`), `StaffId` |
+| `deployment_jobs` | Installations: installer, computer, originating request, status (Queued, Running, Succeeded, SucceededRebootRequired, Failed, Cancelled), attempts, exit code, message | Index (`ComputerId`, `Status`); FK `PackageId` (restrict) |
 | `audit_log` | Append-only, hash-chained audit trail | Triggers `audit_log_no_update` / `audit_log_no_delete` reject changes; indexes on `OccurredAtUtc`, `Action` |
 
 ## Audit hash chain

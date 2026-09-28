@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using OfficeSecurity.Client.Core;
@@ -81,7 +82,12 @@ public sealed partial class StaffShellViewModel : ObservableObject
 
     public void ShowActivate() => Current = new StaffActivateViewModel(this);
 
-    public void ShowHome(CurrentUserResponse user) => Current = new StaffHomeViewModel(this, user);
+    public void ShowHome(CurrentUserResponse user)
+    {
+        var home = new StaffHomeViewModel(this, user) { SessionEnded = SessionEnded };
+        Current = home;
+        _ = home.RefreshRequestsCommand.ExecuteAsync(null);
+    }
 
     public void SessionEnded(string message) => ShowLogin(error: message);
 
@@ -157,6 +163,43 @@ public sealed partial class StaffHomeViewModel(StaffShellViewModel shell, Curren
 
     public ChangePasswordViewModel ChangePassword { get; } = new(shell.Api) { SessionEnded = shell.SessionEnded };
 
+    // ---- software requests
+    [ObservableProperty]
+    public partial string RequestSoftwareName { get; set; } = string.Empty;
+
+    [ObservableProperty]
+    public partial string RequestReason { get; set; } = string.Empty;
+
+    public ObservableCollection<SoftwareRequestResponse> MyRequests { get; } = [];
+
     [RelayCommand]
     private Task SignOutAsync() => shell.SignOutAsync();
+
+    [RelayCommand]
+    private Task SubmitRequestAsync() => RunAsync(async () =>
+    {
+        var created = await shell.Api.CreateSoftwareRequestAsync(new CreateSoftwareRequest(RequestSoftwareName.Trim(), RequestReason.Trim()));
+        RequestSoftwareName = RequestReason = string.Empty;
+        InfoMessage = $"Your request for {created.SoftwareName} was sent. An administrator will review it; if approved, it is installed on "
+            + (created.ComputerName ?? "your computer") + " automatically.";
+        await FetchRequestsAsync();
+    });
+
+    [RelayCommand]
+    private Task RefreshRequestsAsync() => RunAsync(FetchRequestsAsync);
+
+    /// <summary>Used by the start-up self-test to render the request list without a server.</summary>
+    internal void ShowSampleForSelfTest() =>
+        MyRequests.Add(new SoftwareRequestResponse(Guid.NewGuid(), Guid.NewGuid(), "Sample", "EMP001", null, "PC-01", "Contoso Viewer", "For reports",
+            SoftwareRequestStatuses.Approved, "OK", "Succeeded", DateTimeOffset.UtcNow, DateTimeOffset.UtcNow));
+
+    private async Task FetchRequestsAsync()
+    {
+        var items = await shell.Api.ListMySoftwareRequestsAsync();
+        MyRequests.Clear();
+        foreach (var item in items)
+        {
+            MyRequests.Add(item);
+        }
+    }
 }

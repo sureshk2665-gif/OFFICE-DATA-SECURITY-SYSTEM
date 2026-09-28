@@ -79,6 +79,10 @@ public sealed partial class ComputersViewModel(ShellViewModel shell, bool canWri
 
     public ObservableCollection<SecurityEventResponse> RecentEvents { get; } = [];
 
+    public ObservableCollection<InstalledSoftwareResponse> InstalledSoftware { get; } = [];
+
+    public ObservableCollection<DeploymentResponse> Installations { get; } = [];
+
     public ObservableCollection<PolicyChoice> PolicyChoices { get; } = [];
 
     [ObservableProperty]
@@ -107,6 +111,8 @@ public sealed partial class ComputersViewModel(ShellViewModel shell, bool canWri
         RecentEvents.Add(new SecurityEventResponse(1, detail.Summary.Id, detail.Summary.Hostname, "DeviceConnected", EventSeverities.Information, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, "sample"));
         PolicyChoices.Add(new PolicyChoice(null, "Default policy (default)"));
         StaffChoices.Add(new StaffChoice(new StaffSummary(Guid.NewGuid(), "EMP001", "Sample", null, AccountStatuses.Active, DateTimeOffset.UtcNow, null, false), true));
+        InstalledSoftware.Add(new InstalledSoftwareResponse(detail.Summary.Id, detail.Summary.Hostname, "Free Game", "2.0", "Games Ltd", "User", false, DateTimeOffset.UtcNow));
+        Installations.Add(new DeploymentResponse(Guid.NewGuid(), Guid.NewGuid(), "Contoso Viewer", "viewer.msi", detail.Summary.Id, detail.Summary.Hostname, null, "Queued", 0, null, null, DateTimeOffset.UtcNow, null));
     }
 
     [RelayCommand]
@@ -251,12 +257,26 @@ public sealed partial class ComputersViewModel(ShellViewModel shell, bool canWri
         var events = await shell.Api.ListEventsAsync(1, 20, id, null);
         var policies = await shell.Api.ListPoliciesAsync();
         var staff = await shell.Api.ListStaffAsync(1, 200, null, null);
+        var software = await shell.Api.ListInstalledSoftwareAsync(id, null);
+        var installations = await shell.Api.ListDeploymentsAsync(1, 20, id, null);
         if (Selected?.Id != id)
         {
             return; // Selection changed while loading.
         }
 
         Detail = detail;
+        InstalledSoftware.Clear();
+        foreach (var s in software)
+        {
+            InstalledSoftware.Add(s);
+        }
+
+        Installations.Clear();
+        foreach (var d in installations.Items)
+        {
+            Installations.Add(d);
+        }
+
         RecentEvents.Clear();
         foreach (var e in events.Items)
         {

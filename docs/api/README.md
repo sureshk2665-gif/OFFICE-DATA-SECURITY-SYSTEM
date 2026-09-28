@@ -110,8 +110,37 @@ Policy types (`PolicySettings`, `PolicyDetail`, …) are in `src/Shared/OfficeSe
 | `POST /api/v1/agent/events` | Computer (mTLS) | `AgentEventsRequest` (≤ 500) → `AgentEventsResponse` |
 | `POST /api/v1/agent/login-ticket` | Computer (mTLS) | → `ComputerLoginTicketResponse` |
 
+| `GET /api/v1/agent/jobs` | Computer (mTLS) | → `AgentJob[]` (this computer's queued and running installations) |
+| `POST /api/v1/agent/jobs/{id}/start` | Computer (mTLS) | → 204 (counts an attempt; 409 after 3 attempts or when cancelled) |
+| `GET /api/v1/agent/jobs/{id}/package` | Computer (mTLS) | → installer file (only for this computer's started job; otherwise 404) |
+| `POST /api/v1/agent/jobs/{id}/result` | Computer (mTLS) | `AgentJobResult` (Succeeded, SucceededRebootRequired, Failed) → 204 |
+
 "Computer (mTLS)" means a TLS client certificate issued by this server to a currently approved computer.
 `POST /auth/staff/login` and `/auth/staff/activate` accept an optional `computerTicket` (see ADR-0006).
+
+## Software (Phase 4, ADR-0007)
+
+| Method & route | Access | Request → Response |
+|---|---|---|
+| `POST /api/v1/software-requests` | Staff | `CreateSoftwareRequest` → `SoftwareRequestResponse` |
+| `GET /api/v1/software-requests/mine` | Staff | → `SoftwareRequestResponse[]` (latest 100) |
+| `GET /api/v1/software-requests?page&pageSize&status` | AdminRead | → `PagedResult<SoftwareRequestResponse>` |
+| `POST /api/v1/software-requests/{id}/approve` | AdminWrite | `ApproveSoftwareRequest` → `SoftwareRequestResponse` (creates an installation) |
+| `POST /api/v1/software-requests/{id}/reject` | AdminWrite | `RejectSoftwareRequest` → `SoftwareRequestResponse` |
+| `GET /api/v1/software/approved` | AdminRead | → `ApprovedSoftwareResponse[]` (with installer files) |
+| `POST /api/v1/software/approved` | AdminWrite | `SaveApprovedSoftwareRequest` → `ApprovedSoftwareResponse` |
+| `PUT /api/v1/software/approved/{id}` | AdminWrite | `SaveApprovedSoftwareRequest` → `ApprovedSoftwareResponse` |
+| `DELETE /api/v1/software/approved/{id}` | AdminWrite | → 204 (409 while it has installer files) |
+| `POST /api/v1/software/approved/{id}/packages?fileName&installerType&silentArguments&signerSubject&allowUnsigned` | AdminWrite | raw file body (≤ 4 GB) → `SoftwarePackageResponse` |
+| `DELETE /api/v1/software/packages/{id}` | AdminWrite | → 204 (409 once used by an installation) |
+| `GET /api/v1/software/deployments?page&pageSize&computerId&status` | AdminRead | → `PagedResult<DeploymentResponse>` |
+| `POST /api/v1/software/deployments` | AdminWrite | `CreateDeploymentRequest` (1–500 approved computers) → `DeploymentResponse[]` |
+| `POST /api/v1/software/deployments/{id}/cancel` | AdminWrite | → 204 (only while queued) |
+| `GET /api/v1/software/inventory?search&unapprovedOnly` | AdminRead | → `SoftwareTitleSummary[]` |
+| `GET /api/v1/software/inventory/computers?computerId&name` | AdminRead | → `InstalledSoftwareResponse[]` |
+
+`AgentInventoryRequest` has an optional `software` list (`InstalledSoftware[]`); `AgentHeartbeatResponse` has
+`pendingJobs`.
 
 ## Status codes
 

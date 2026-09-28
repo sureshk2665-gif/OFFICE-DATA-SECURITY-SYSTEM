@@ -9,6 +9,7 @@
         <ResourceDictionary Source="Views/SignInViews.xaml" />
         <ResourceDictionary Source="Views/WorkspaceViews.xaml" />
         <ResourceDictionary Source="Views/ComputerViews.xaml" />
+        <ResourceDictionary Source="Views/SoftwareViews.xaml" />
       </ResourceDictionary.MergedDictionaries>
     </ResourceDictionary>
   </Application.Resources>

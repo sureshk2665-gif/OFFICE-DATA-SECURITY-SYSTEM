@@ -58,6 +58,21 @@ Implemented, but only partly verified:
 Known gap: truncating the newest audit entries is not yet detectable. An external anchor (Windows Event
 Log) is planned for Phase 6.
 
+## Phase 4 status
+Implemented and tested (automated; see the Phase 4 test report):
+- Installers run only when their size, SHA-256 fingerprint and Authenticode signer match the administrator's
+  approved record. Any mismatch → not run + Critical event.
+- Only administrators create installation jobs, only for approved computers. A computer can see and download
+  only its own started jobs.
+- Staff can request software, but cannot create jobs or read other people's requests or the inventory.
+- Server-supplied file names cannot place the download outside the agent's protected folder.
+
+Accepted risks (ADR-0007):
+- An administrator can run any uploaded installer as LocalSystem. This is limited to administrators and audited.
+- Signature revocation is not checked online.
+- The file is verified and then run from the agent's data folder. Between those two steps only SYSTEM and
+  administrators can modify it.
+
 ## Residual risks (accepted, documented to owner)
 Local administrators can disable controls. Screenshots, photographs and uploads to *allowed* websites cannot be
 fully prevented without extra DLP products (plan §14).

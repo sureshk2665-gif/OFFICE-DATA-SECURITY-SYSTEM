@@ -1,0 +1,254 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:vm="clr-namespace:OfficeSecurity.AdminDashboard.ViewModels">
+
+  <ResourceDictionary.MergedDictionaries>
+    <ResourceDictionary Source="pack://application:,,,/OfficeSecurity.Client.Wpf;component/Themes/SharedViews.xaml" />
+  </ResourceDictionary.MergedDictionaries>
+
+  <!-- ============================== software management ============================== -->
+  <DataTemplate DataType="{x:Type vm:SoftwareViewModel}">
+    <StackPanel>
+      <TextBlock Text="Software Management" Style="{StaticResource Text.PageTitle}" />
+      <ContentControl Content="{Binding}" ContentTemplate="{StaticResource Messages}" />
+
+      <!-- Approved software -->
+      <Border Style="{StaticResource Card}">
+        <StackPanel>
+          <DockPanel Margin="0,0,0,8">
+            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Visibility="{Binding CanWrite, Converter={StaticResource BoolToVisibility}}">
+              <Button Content="Add program" Command="{Binding OpenAddTitleCommand}" Style="{StaticResource Button.Primary}" />
+              <Button Content="Edit" Command="{Binding OpenEditTitleCommand}" IsEnabled="{Binding HasSelectedTitle}" Style="{StaticResource Button.Secondary}" Margin="8,0,0,0" />
+              <Button Content="Remove" Command="{Binding RemoveTitleCommand}" IsEnabled="{Binding HasSelectedTitle}" Style="{StaticResource Button.Danger}" Margin="8,0,0,0" />
+            </StackPanel>
+            <TextBlock Text="Approved software" Style="{StaticResource Text.SectionTitle}" />
+          </DockPanel>
+          <TextBlock Style="{StaticResource Text.Muted}" TextWrapping="Wrap" Margin="0,0,0,8"
+                     Text="Programs staff may have. A program found on a computer counts as approved when its name starts with the name below (and, if given, its publisher matches). Other programs are listed as 'not approved'; nothing is removed or blocked automatically." />
+          <DataGrid ItemsSource="{Binding Approved}" SelectedItem="{Binding SelectedTitle}" Style="{StaticResource Grid.Table}" MinHeight="100" MaxHeight="260">
+            <DataGrid.Columns>
+              <DataGridTextColumn Header="Program name" Binding="{Binding Name}" Width="*" />
+              <DataGridTextColumn Header="Publisher" Binding="{Binding Publisher}" Width="200" />
+              <DataGridTextColumn Header="Installer files" Binding="{Binding Packages.Count}" Width="100" />
+              <DataGridTextColumn Header="Notes" Binding="{Binding Notes}" Width="220" />
+            </DataGrid.Columns>
+          </DataGrid>
+        </StackPanel>
+      </Border>
+
+      <!-- Add / edit approved program -->
+      <Border Style="{StaticResource Card}" Visibility="{Binding IsTitleFormOpen, Converter={StaticResource BoolToVisibility}}">
+        <StackPanel MaxWidth="520" HorizontalAlignment="Left">
+          <TextBlock Text="Approved program" Style="{StaticResource Text.SectionTitle}" />
+          <TextBlock Text="Name, as shown in Windows 'Installed apps' (the start of it is enough, e.g. 'Adobe Acrobat')" Style="{StaticResource Text.Label}" TextWrapping="Wrap" />
+          <TextBox Text="{Binding TitleName, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource TextBox.Field}" />
+          <TextBlock Text="Publisher (optional, must match exactly, e.g. 'Adobe Inc.')" Style="{StaticResource Text.Label}" />
+          <TextBox Text="{Binding TitlePublisher, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource TextBox.Field}" />
+          <TextBlock Text="Notes (optional)" Style="{StaticResource Text.Label}" />
+          <TextBox Text="{Binding TitleNotes, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource TextBox.Field}" />
+          <StackPanel Orientation="Horizontal" Margin="0,16,0,0">
+            <Button Content="Save" Command="{Binding SaveTitleCommand}" IsEnabled="{Binding IsNotBusy}" Style="{StaticResource Button.Primary}" />
+            <Button Content="Cancel" Command="{Binding CloseFormsCommand}" Style="{StaticResource Button.Secondary}" Margin="8,0,0,0" />
+          </StackPanel>
+        </StackPanel>
+      </Border>
+
+      <!-- Installer files of the selected program -->
+      <Border Style="{StaticResource Card}" Visibility="{Binding HasSelectedTitle, Converter={StaticResource BoolToVisibility}}">
+        <StackPanel>
+          <DockPanel Margin="0,0,0,8">
+            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Visibility="{Binding CanWrite, Converter={StaticResource BoolToVisibility}}">
+              <Button Content="Upload installer…" Command="{Binding ChooseInstallerCommand}" Style="{StaticResource Button.Primary}" />
+              <Button Content="Install on computers…" Command="{Binding OpenDeployCommand}" IsEnabled="{Binding HasSelectedPackage}" Style="{StaticResource Button.Primary}" Margin="8,0,0,0" />
+              <Button Content="Delete installer" Command="{Binding DeletePackageCommand}" IsEnabled="{Binding HasSelectedPackage}" Style="{StaticResource Button.Danger}" Margin="8,0,0,0" />
+            </StackPanel>
+            <TextBlock Style="{StaticResource Text.SectionTitle}">
+              <Run Text="Installer files for " /><Run Text="{Binding SelectedTitle.Name, Mode=OneWay}" />
+            </TextBlock>
+          </DockPanel>
+          <DataGrid ItemsSource="{Binding SelectedPackages}" SelectedItem="{Binding SelectedPackage}" Style="{StaticResource Grid.Table}" MinHeight="80" MaxHeight="220">
+            <DataGrid.Columns>
+              <DataGridTextColumn Header="File" Binding="{Binding FileName}" Width="200" />
+              <DataGridTextColumn Header="Type" Binding="{Binding InstallerType}" Width="60" />
+              <DataGridTextColumn Header="Size (bytes)" Binding="{Binding SizeBytes, StringFormat='{}{0:N0}'}" Width="110" />
+              <DataGridTextColumn Header="Signed by" Binding="{Binding SignerSubject, TargetNullValue='(not signed)'}" Width="*" />
+              <DataGridTextColumn Header="Silent options" Binding="{Binding SilentArguments}" Width="120" />
+              <DataGridTextColumn Header="Uploaded" Binding="{Binding UploadedAtUtc, Converter={StaticResource LocalTime}}" Width="140" />
+            </DataGrid.Columns>
+          </DataGrid>
+        </StackPanel>
+      </Border>
+
+      <!-- Upload -->
+      <Border Style="{StaticResource Card}" Visibility="{Binding IsUploadOpen, Converter={StaticResource BoolToVisibility}}">
+        <StackPanel MaxWidth="700" HorizontalAlignment="Left">
+          <TextBlock Text="Upload installer" Style="{StaticResource Text.SectionTitle}" />
+          <TextBlock Text="{Binding UploadPath}" Style="{StaticResource Text.Body}" FontFamily="Consolas" TextWrapping="Wrap" />
+          <Border Style="{StaticResource Banner.Info}" Margin="0,8,0,0">
+            <TextBlock Text="{Binding SignatureText}" Style="{StaticResource Text.Body}" TextWrapping="Wrap" />
+          </Border>
+          <CheckBox Content="I trust this unsigned file: allow computers to install it without a signature" IsChecked="{Binding AllowUnsigned}"
+                    Visibility="{Binding CanAllowUnsigned, Converter={StaticResource BoolToVisibility}}" Margin="0,8,0,0" />
+          <TextBlock Style="{StaticResource Text.Label}" TextWrapping="Wrap"
+                     Text="Silent install options. Required for .exe installers (see the publisher's documentation, often /S, /quiet or /silent). Optional for .msi files (extra properties, e.g. ALLUSERS=1)." />
+          <TextBox Text="{Binding UploadSilentArguments, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource TextBox.Field}" FontFamily="Consolas" />
+          <TextBlock Style="{StaticResource Text.Muted}" TextWrapping="Wrap" Margin="0,8,0,0"
+                     Text="MSI files are installed with: msiexec /i file /qn /norestart. Computers are never restarted automatically; if Windows needs a restart the installation shows 'SucceededRebootRequired'." />
+          <TextBlock Text="{Binding UploadProgressText}" Style="{StaticResource Text.Body}" Margin="0,8,0,0" />
+          <StackPanel Orientation="Horizontal" Margin="0,16,0,0">
+            <Button Content="Upload" Command="{Binding UploadCommand}" IsEnabled="{Binding IsNotBusy}" Style="{StaticResource Button.Primary}" />
+            <Button Content="Cancel" Command="{Binding CloseFormsCommand}" IsEnabled="{Binding IsNotBusy}" Style="{StaticResource Button.Secondary}" Margin="8,0,0,0" />
+          </StackPanel>
+        </StackPanel>
+      </Border>
+
+      <!-- Deploy -->
+      <Border Style="{StaticResource Card}" Visibility="{Binding IsDeployOpen, Converter={StaticResource BoolToVisibility}}">
+        <StackPanel>
+          <TextBlock Style="{StaticResource Text.SectionTitle}">
+            <Run Text="Install " /><Run Text="{Binding SelectedPackage.FileName, Mode=OneWay}" /><Run Text=" on these computers" />
+          </TextBlock>
+          <TextBlock Style="{StaticResource Text.Muted}" TextWrapping="Wrap" Margin="0,0,0,8"
+                     Text="Only approved computers are listed. Offline computers install it when they are next switched on." />
+          <ItemsControl ItemsSource="{Binding DeployChoices}" MaxHeight="220">
+            <ItemsControl.Template>
+              <ControlTemplate TargetType="ItemsControl">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                  <ItemsPresenter />
+                </ScrollViewer>
+              </ControlTemplate>
+            </ItemsControl.Template>
+            <ItemsControl.ItemsPanel>
+              <ItemsPanelTemplate>
+                <UniformGrid Columns="3" />
+              </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+              <DataTemplate>
+                <CheckBox Content="{Binding Label}" IsChecked="{Binding IsSelected}" Margin="0,2" />
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+          <StackPanel Orientation="Horizontal" Margin="0,16,0,0">
+            <Button Content="Install" Command="{Binding DeployCommand}" IsEnabled="{Binding IsNotBusy}" Style="{StaticResource Button.Primary}" />
+            <Button Content="Cancel" Command="{Binding CloseFormsCommand}" Style="{StaticResource Button.Secondary}" Margin="8,0,0,0" />
+          </StackPanel>
+        </StackPanel>
+      </Border>
+
+      <!-- Installations -->
+      <Border Style="{StaticResource Card}">
+        <StackPanel>
+          <DockPanel Margin="0,0,0,8">
+            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+              <Button Content="Cancel installation" Command="{Binding CancelDeploymentCommand}" IsEnabled="{Binding CanCancelDeployment}" Style="{StaticResource Button.Secondary}"
+                      Visibility="{Binding CanWrite, Converter={StaticResource BoolToVisibility}}" />
+              <Button Content="Refresh" Command="{Binding RefreshDeploymentsCommand}" Style="{StaticResource Button.Secondary}" Margin="8,0,0,0" />
+            </StackPanel>
+            <TextBlock Text="Installations (latest 100)" Style="{StaticResource Text.SectionTitle}" />
+          </DockPanel>
+          <DataGrid ItemsSource="{Binding Deployments}" SelectedItem="{Binding SelectedDeployment}" Style="{StaticResource Grid.Table}" MinHeight="100" MaxHeight="300">
+            <DataGrid.Columns>
+              <DataGridTextColumn Header="Program" Binding="{Binding SoftwareName}" Width="160" />
+              <DataGridTextColumn Header="File" Binding="{Binding FileName}" Width="150" />
+              <DataGridTextColumn Header="Computer" Binding="{Binding ComputerName}" Width="120" />
+              <DataGridTextColumn Header="Status" Binding="{Binding Status}" Width="170" />
+              <DataGridTextColumn Header="Tries" Binding="{Binding Attempts}" Width="50" />
+              <DataGridTextColumn Header="Exit code" Binding="{Binding ExitCode}" Width="70" />
+              <DataGridTextColumn Header="Result" Binding="{Binding Message}" Width="*" />
+              <DataGridTextColumn Header="Requested" Binding="{Binding CreatedAtUtc, Converter={StaticResource LocalTime}}" Width="140" />
+            </DataGrid.Columns>
+          </DataGrid>
+        </StackPanel>
+      </Border>
+
+      <!-- Found on computers -->
+      <Border Style="{StaticResource Card}">
+        <StackPanel>
+          <DockPanel Margin="0,0,0,8">
+            <Button DockPanel.Dock="Right" Content="Add to approved list" Command="{Binding ApproveFoundTitleCommand}" IsEnabled="{Binding CanApproveFoundTitle}"
+                    Style="{StaticResource Button.Primary}" Visibility="{Binding CanWrite, Converter={StaticResource BoolToVisibility}}" />
+            <TextBlock Text="Programs found on approved computers" Style="{StaticResource Text.SectionTitle}" />
+          </DockPanel>
+          <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+            <TextBox Text="{Binding InventorySearch, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource TextBox.Field}" Width="240" ToolTip="Search by program or publisher" />
+            <CheckBox Content="Only programs not on the approved list" IsChecked="{Binding UnapprovedOnly}" VerticalAlignment="Center" Margin="12,0,0,0" />
+            <Button Content="Search" Command="{Binding SearchInventoryCommand}" Style="{StaticResource Button.Secondary}" Margin="12,0,0,0" />
+          </StackPanel>
+          <DataGrid ItemsSource="{Binding Titles}" SelectedItem="{Binding SelectedFound}" Style="{StaticResource Grid.Table}" MinHeight="120" MaxHeight="340">
+            <DataGrid.Columns>
+              <DataGridCheckBoxColumn Header="Approved" Binding="{Binding IsApproved}" Width="70" />
+              <DataGridTextColumn Header="Program" Binding="{Binding Name}" Width="*" />
+              <DataGridTextColumn Header="Publisher" Binding="{Binding Publisher}" Width="200" />
+              <DataGridTextColumn Header="Computers" Binding="{Binding ComputerCount}" Width="80" />
+            </DataGrid.Columns>
+          </DataGrid>
+          <TextBlock Text="Computers with the selected program" Style="{StaticResource Text.Label}" Margin="0,12,0,4" />
+          <DataGrid ItemsSource="{Binding FoundOn}" Style="{StaticResource Grid.Table}" MinHeight="60" MaxHeight="200">
+            <DataGrid.Columns>
+              <DataGridTextColumn Header="Computer" Binding="{Binding ComputerName}" Width="150" />
+              <DataGridTextColumn Header="Version" Binding="{Binding Version}" Width="120" />
+              <DataGridTextColumn Header="Installed for" Binding="{Binding Scope}" Width="100" />
+              <DataGridTextColumn Header="First seen" Binding="{Binding FirstSeenUtc, Converter={StaticResource LocalTime}}" Width="*" />
+            </DataGrid.Columns>
+          </DataGrid>
+        </StackPanel>
+      </Border>
+    </StackPanel>
+  </DataTemplate>
+
+  <!-- ============================== installation requests ============================== -->
+  <DataTemplate DataType="{x:Type vm:SoftwareRequestsViewModel}">
+    <StackPanel>
+      <TextBlock Text="Installation Requests" Style="{StaticResource Text.PageTitle}" />
+      <ContentControl Content="{Binding}" ContentTemplate="{StaticResource Messages}" />
+
+      <Border Style="{StaticResource Card}">
+        <StackPanel>
+          <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+            <ComboBox ItemsSource="{Binding StatusFilters}" SelectedItem="{Binding StatusFilter}" Width="220" VerticalContentAlignment="Center" />
+            <Button Content="Refresh" Command="{Binding LoadCommand}" Style="{StaticResource Button.Secondary}" Margin="8,0,0,0" />
+          </StackPanel>
+          <DataGrid ItemsSource="{Binding Items}" SelectedItem="{Binding Selected}" Style="{StaticResource Grid.Table}" MinHeight="160" MaxHeight="360">
+            <DataGrid.Columns>
+              <DataGridTextColumn Header="Requested" Binding="{Binding CreatedAtUtc, Converter={StaticResource LocalTime}}" Width="140" />
+              <DataGridTextColumn Header="Staff member" Binding="{Binding StaffName}" Width="150" />
+              <DataGridTextColumn Header="Computer" Binding="{Binding ComputerName, TargetNullValue='(unknown)'}" Width="120" />
+              <DataGridTextColumn Header="Software" Binding="{Binding SoftwareName}" Width="*" />
+              <DataGridTextColumn Header="Decision" Binding="{Binding Status}" Width="90" />
+              <DataGridTextColumn Header="Installation" Binding="{Binding InstallStatus}" Width="170" />
+            </DataGrid.Columns>
+          </DataGrid>
+        </StackPanel>
+      </Border>
+
+      <Border Style="{StaticResource Card}" Visibility="{Binding HasSelection, Converter={StaticResource BoolToVisibility}}">
+        <StackPanel MaxWidth="700" HorizontalAlignment="Left">
+          <TextBlock Style="{StaticResource Text.SectionTitle}">
+            <Run Text="{Binding Selected.SoftwareName, Mode=OneWay}" /><Run Text=" — requested by " /><Run Text="{Binding Selected.StaffName, Mode=OneWay}" /><Run Text=" (" /><Run Text="{Binding Selected.EmployeeCode, Mode=OneWay}" /><Run Text=")" />
+          </TextBlock>
+          <TextBlock Text="Reason given" Style="{StaticResource Text.Label}" />
+          <TextBlock Text="{Binding Selected.Reason}" Style="{StaticResource Text.Body}" TextWrapping="Wrap" />
+          <TextBlock Style="{StaticResource Text.Muted}" Margin="0,8,0,0">
+            <Run Text="Administrator note: " /><Run Text="{Binding Selected.ReviewNote, Mode=OneWay, TargetNullValue='—'}" />
+          </TextBlock>
+
+          <StackPanel Visibility="{Binding CanDecide, Converter={StaticResource BoolToVisibility}}" Margin="0,12,0,0">
+            <TextBlock Text="Install this approved installer" Style="{StaticResource Text.Label}" />
+            <ComboBox ItemsSource="{Binding Packages}" SelectedItem="{Binding SelectedPackage}" DisplayMemberPath="Label" Width="420" HorizontalAlignment="Left" />
+            <TextBlock Text="On this computer (the one the request was made from is chosen automatically)" Style="{StaticResource Text.Label}" />
+            <ComboBox ItemsSource="{Binding Computers}" SelectedItem="{Binding SelectedComputer}" DisplayMemberPath="Label" Width="260" HorizontalAlignment="Left" />
+            <TextBlock Text="Note to the staff member (optional)" Style="{StaticResource Text.Label}" />
+            <TextBox Text="{Binding Note, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource TextBox.Field}" />
+            <TextBlock Style="{StaticResource Text.Muted}" TextWrapping="Wrap" Margin="0,8,0,0"
+                       Text="If the software is not listed, add it and upload its installer under 'Software Management' first." />
+            <StackPanel Orientation="Horizontal" Margin="0,16,0,0">
+              <Button Content="Approve and install" Command="{Binding ApproveCommand}" IsEnabled="{Binding IsNotBusy}" Style="{StaticResource Button.Primary}" />
+              <Button Content="Reject" Command="{Binding RejectCommand}" IsEnabled="{Binding IsNotBusy}" Style="{StaticResource Button.Danger}" Margin="8,0,0,0" />
+            </StackPanel>
+          </StackPanel>
+        </StackPanel>
+      </Border>
+    </StackPanel>
+  </DataTemplate>
+</ResourceDictionary>

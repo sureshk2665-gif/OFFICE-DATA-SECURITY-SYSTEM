@@ -66,6 +66,12 @@ internal static class SmokeTest
         Check("Sign-in", () => new StaffLoginViewModel(shell) { ErrorMessage = "Example error" });
         Check("First sign-in", () => new StaffActivateViewModel(shell));
         Check("Home", () => new StaffHomeViewModel(shell, user));
+        Check("Home with software requests", () =>
+        {
+            var home = new StaffHomeViewModel(shell, user);
+            home.ShowSampleForSelfTest();
+            return home;
+        });
 
         log.AppendLine(failures == 0 ? "RESULT: all screens built successfully" : string.Create(CultureInfo.InvariantCulture, $"RESULT: {failures} screen(s) failed"));
         if (!string.IsNullOrEmpty(logPath))

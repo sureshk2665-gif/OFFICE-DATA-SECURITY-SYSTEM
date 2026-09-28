@@ -75,7 +75,25 @@ STEP 8 - Policies and events
   "Security Events": everything the computers report. "USB connection log" shows USB
   drives, phones and Bluetooth devices being connected.
 
-STEP 9 - Look at the audit log
+STEP 9 - Software: approved list, installers, requests
+  "Software Management":
+    - "Programs found on approved computers" lists every program the computers report
+      (as in Windows "Installed apps"). Tick "Only programs not on the approved list" to
+      see what staff installed without approval. Nothing is removed or blocked yet (Phase 5).
+    - "Add program" puts a program on the approved list (name as shown in Installed apps;
+      the start of the name is enough).
+    - Select a program, click "Upload installer..." and choose its .msi or .exe file.
+      Download installers only from the publisher's official website. The dashboard
+      shows who signed the file. For .exe files enter the silent install options from the
+      publisher's documentation (often /S or /quiet).
+    - Select the uploaded installer and click "Install on computers...". Each computer
+      checks the file's fingerprint and signature before installing it silently.
+      Progress is shown under "Installations".
+  Staff ask for software in the staff app ("Request software"). You decide under
+  "Installation Requests": choose the installer and click "Approve and install", or
+  "Reject" with a note. The staff member sees the result in "My requests".
+
+STEP 10 - Look at the audit log
   In the dashboard open "Audit Logs". Every sign-in, failed sign-in and account change is listed.
   Click "Verify integrity" to check that nobody has altered the log.
 

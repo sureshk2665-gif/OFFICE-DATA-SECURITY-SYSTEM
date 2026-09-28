@@ -20,4 +20,10 @@ public sealed class WpfUiServices : IUiServices
             // The clipboard is briefly locked by another program; the code remains visible to copy manually.
         }
     }
+
+    public string? PickFile(string title, string filter)
+    {
+        var dialog = new Microsoft.Win32.OpenFileDialog { Title = title, Filter = filter, CheckFileExists = true, Multiselect = false };
+        return dialog.ShowDialog(Application.Current?.MainWindow) == true ? dialog.FileName : null;
+    }
 }

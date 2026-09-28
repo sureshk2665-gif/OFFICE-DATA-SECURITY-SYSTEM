@@ -53,8 +53,8 @@ public sealed partial class WorkspaceViewModel : ObservableObject
         [
             new PoliciesViewModel(shell, canWrite),
             new PlannedSectionViewModel("USB Device Control", 5, "Block removable storage and phones; approve specific USB devices by hardware ID."),
-            new PlannedSectionViewModel("Software Management", 4, "Software inventory of every computer and the list of approved applications."),
-            new PlannedSectionViewModel("Installation Requests", 4, "Review, approve or reject software requests from staff; deploy approved software."),
+            new SoftwareViewModel(shell, canWrite),
+            new SoftwareRequestsViewModel(shell, canWrite),
             new PlannedSectionViewModel("File Safety", 5, "Protected company folders, file access auditing, and backup status."),
             new EventsViewModel(shell),
             new PlannedSectionViewModel("Security Alerts", 6, "Alerts for blocked devices, failed logins, stopped agents and policy violations."),

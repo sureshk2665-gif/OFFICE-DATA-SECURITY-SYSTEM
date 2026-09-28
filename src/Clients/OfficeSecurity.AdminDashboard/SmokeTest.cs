@@ -97,6 +97,18 @@ internal static class SmokeTest
             computers.ShowSampleForSelfTest(detail, new EnrollmentCodeResponse("ABCD-EFGH-JKMN", DateTimeOffset.UtcNow.AddDays(1), "1234-5678-9ABC-DEF0-1234"));
             return computers;
         });
+        Check("Software management with all panels", () =>
+        {
+            var software = new SoftwareViewModel(shell, canWrite: true);
+            software.ShowSampleForSelfTest();
+            return software;
+        });
+        Check("Installation request decision", () =>
+        {
+            var requests = new SoftwareRequestsViewModel(shell, canWrite: true);
+            requests.ShowSampleForSelfTest();
+            return requests;
+        });
         Check("Policy editor", () =>
         {
             var policies = new PoliciesViewModel(shell, canWrite: true);

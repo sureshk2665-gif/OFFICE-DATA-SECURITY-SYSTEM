@@ -3,9 +3,9 @@
 Centralized Windows computer management, file safety and security enforcement for an office LAN.
 There is no screen monitoring, screen recording, screenshots, keystroke logging, webcam or microphone capture.
 
-> **Status: Phase 3 (computer management, security agent, signed policies) complete — development build only.**
-> **No computer security control is enforced yet.** USB, software and file protection arrive in Phases 4–5.
-> Every control is reported as `NotImplemented` until its phase is delivered and tested.
+> **Status: Phase 4 (software inventory, requests, approved installation) complete — development build only.**
+> **No blocking control is enforced yet.** Unapproved software is reported, not blocked; USB, application and
+> file protection arrive in Phase 5. Every control is reported as `NotImplemented` until its phase is delivered and tested.
 
 ## Getting the `.exe` files
 
@@ -30,18 +30,18 @@ Every push is built on a Windows machine by GitHub Actions:
 | 1 | Architecture, decisions (ADRs), threat model, solution skeleton, signed policy format, CI | **Done** |
 | 2 | Database, admin sign-in with two-step verification, staff accounts, roles, tamper-evident audit log, pinned HTTPS | **Done** |
 | 3 | Computer enrollment and approval, agent Windows Service, mutual TLS, signed policy distribution, offline queue, device inventory, staff restricted to computers | **Done** |
-| 4 | Software inventory, installation requests and approvals, approved deployment | Next |
-| 5 | USB / device control, application control, network & browser restrictions, file protection | Planned |
+| 4 | Software inventory, installation requests and approvals, approved deployment with hash and signature checks | **Done** |
+| 5 | USB / device control, application control, network & browser restrictions, file protection | Next |
 | 6 | Security events, alerts, audit log, reports (CSV/PDF) | Planned |
 | 7 | MSI installers, full testing, pilot deployment | Planned |
 
 ## Documentation
 
 - [Architecture & implementation plan](docs/00-ARCHITECTURE-AND-PLAN.md)
-- [Decisions (ADRs)](docs/adr/): default assumptions, database, identity & trust, packaging
+- [Decisions (ADRs)](docs/adr/): default assumptions, database, identity & trust, packaging, authentication, agent enrollment, software management
 - [Threat model](docs/security/threat-model.md)
 - [API reference](docs/api/README.md) · [Database schema](docs/database/schema.md)
-- [Phase 2 test report](docs/testing/phase-2-test-report.md) · [Phase 3 test report](docs/testing/phase-3-test-report.md)
+- [Phase 2 test report](docs/testing/phase-2-test-report.md) · [Phase 3 test report](docs/testing/phase-3-test-report.md) · [Phase 4 test report](docs/testing/phase-4-test-report.md)
 
 ## For developers
 

@@ -129,6 +129,39 @@
 
         <Border Style="{StaticResource Card}">
           <StackPanel>
+            <TextBlock Text="Installed programs" Style="{StaticResource Text.SectionTitle}" />
+            <TextBlock Style="{StaticResource Text.Muted}" Margin="0,0,0,8" TextWrapping="Wrap"
+                       Text="As listed by Windows ('Installed apps'), reported by the agent every 15 minutes. Programs not on the approved list are shown unticked." />
+            <DataGrid ItemsSource="{Binding InstalledSoftware}" Style="{StaticResource Grid.Table}" MinHeight="80" MaxHeight="280">
+              <DataGrid.Columns>
+                <DataGridCheckBoxColumn Header="Approved" Binding="{Binding IsApproved}" Width="70" />
+                <DataGridTextColumn Header="Program" Binding="{Binding Name}" Width="*" />
+                <DataGridTextColumn Header="Version" Binding="{Binding Version}" Width="110" />
+                <DataGridTextColumn Header="Publisher" Binding="{Binding Publisher}" Width="180" />
+                <DataGridTextColumn Header="Installed for" Binding="{Binding Scope}" Width="90" />
+                <DataGridTextColumn Header="First seen" Binding="{Binding FirstSeenUtc, Converter={StaticResource LocalTime}}" Width="140" />
+              </DataGrid.Columns>
+            </DataGrid>
+          </StackPanel>
+        </Border>
+
+        <Border Style="{StaticResource Card}">
+          <StackPanel>
+            <TextBlock Text="Software installations on this computer" Style="{StaticResource Text.SectionTitle}" />
+            <DataGrid ItemsSource="{Binding Installations}" Style="{StaticResource Grid.Table}" MinHeight="60" MaxHeight="220">
+              <DataGrid.Columns>
+                <DataGridTextColumn Header="Program" Binding="{Binding SoftwareName}" Width="160" />
+                <DataGridTextColumn Header="File" Binding="{Binding FileName}" Width="150" />
+                <DataGridTextColumn Header="Status" Binding="{Binding Status}" Width="170" />
+                <DataGridTextColumn Header="Result" Binding="{Binding Message}" Width="*" />
+                <DataGridTextColumn Header="Requested" Binding="{Binding CreatedAtUtc, Converter={StaticResource LocalTime}}" Width="140" />
+              </DataGrid.Columns>
+            </DataGrid>
+          </StackPanel>
+        </Border>
+
+        <Border Style="{StaticResource Card}">
+          <StackPanel>
             <TextBlock Text="Security policy" Style="{StaticResource Text.SectionTitle}" />
             <StackPanel Orientation="Horizontal">
               <ComboBox ItemsSource="{Binding PolicyChoices}" SelectedItem="{Binding SelectedPolicy}" DisplayMemberPath="Name" Width="300" IsEnabled="{Binding CanWrite}" />

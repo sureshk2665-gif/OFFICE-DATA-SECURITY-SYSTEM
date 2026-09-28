@@ -65,10 +65,36 @@
           <TextBlock Text="{Binding Greeting}" Style="{StaticResource Text.Muted}" />
         </StackPanel>
       </DockPanel>
+      <ContentControl Content="{Binding}" ContentTemplate="{StaticResource Messages}" />
       <Border Style="{StaticResource Card}">
         <StackPanel>
           <TextBlock Text="Request software" Style="{StaticResource Text.SectionTitle}" />
-          <TextBlock Text="Software requests will be available after development Phase 4." Style="{StaticResource Text.Muted}" />
+          <TextBlock Style="{StaticResource Text.Muted}" TextWrapping="Wrap" Margin="0,0,0,4"
+                     Text="Ask for a program you need for your work. If an administrator approves it, it is installed on this computer automatically; you do not need administrator rights." />
+          <TextBlock Text="Program name (for example: Adobe Acrobat Reader)" Style="{StaticResource Text.Label}" />
+          <TextBox Text="{Binding RequestSoftwareName, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource TextBox.Field}" MaxLength="200" />
+          <TextBlock Text="Why do you need it?" Style="{StaticResource Text.Label}" />
+          <TextBox Text="{Binding RequestReason, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource TextBox.Field}" MaxLength="1000"
+                   AcceptsReturn="True" TextWrapping="Wrap" MinHeight="60" VerticalContentAlignment="Top" />
+          <Button Content="Send request" Command="{Binding SubmitRequestCommand}" IsEnabled="{Binding IsNotBusy}" Style="{StaticResource Button.Primary}"
+                  HorizontalAlignment="Left" Margin="0,12,0,0" />
+        </StackPanel>
+      </Border>
+      <Border Style="{StaticResource Card}">
+        <StackPanel>
+          <DockPanel Margin="0,0,0,8">
+            <Button DockPanel.Dock="Right" Content="Refresh" Command="{Binding RefreshRequestsCommand}" Style="{StaticResource Button.Secondary}" />
+            <TextBlock Text="My requests" Style="{StaticResource Text.SectionTitle}" />
+          </DockPanel>
+          <DataGrid ItemsSource="{Binding MyRequests}" Style="{StaticResource Grid.Table}" MinHeight="80" MaxHeight="260">
+            <DataGrid.Columns>
+              <DataGridTextColumn Header="Requested" Binding="{Binding CreatedAtUtc, Converter={StaticResource LocalTime}}" Width="140" />
+              <DataGridTextColumn Header="Program" Binding="{Binding SoftwareName}" Width="*" />
+              <DataGridTextColumn Header="Decision" Binding="{Binding Status}" Width="90" />
+              <DataGridTextColumn Header="Installation" Binding="{Binding InstallStatus}" Width="150" />
+              <DataGridTextColumn Header="Administrator's note" Binding="{Binding ReviewNote}" Width="200" />
+            </DataGrid.Columns>
+          </DataGrid>
         </StackPanel>
       </Border>
       <Border Style="{StaticResource Card}">

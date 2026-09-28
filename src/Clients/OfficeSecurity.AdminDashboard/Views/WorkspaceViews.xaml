@@ -102,6 +102,22 @@
           </StackPanel>
         </Border>
       </UniformGrid>
+      <UniformGrid Columns="2">
+        <Border Style="{StaticResource Card}" Margin="0,0,12,16">
+          <StackPanel>
+            <TextBlock Text="Software requests waiting for a decision" Style="{StaticResource Text.Muted}" />
+            <TextBlock Text="{Binding Overview.PendingSoftwareRequests, FallbackValue=—}" FontSize="30" FontWeight="SemiBold" />
+            <TextBlock Text="See 'Installation Requests'" Style="{StaticResource Text.Muted}" />
+          </StackPanel>
+        </Border>
+        <Border Style="{StaticResource Card}" Margin="0,0,0,16">
+          <StackPanel>
+            <TextBlock Text="Computers with programs not on the approved list" Style="{StaticResource Text.Muted}" />
+            <TextBlock Text="{Binding Overview.ComputersWithUnapprovedSoftware, FallbackValue=—}" FontSize="30" FontWeight="SemiBold" />
+            <TextBlock Text="See 'Software Management'" Style="{StaticResource Text.Muted}" />
+          </StackPanel>
+        </Border>
+      </UniformGrid>
       <Border Style="{StaticResource Card}">
         <StackPanel>
           <TextBlock Text="Alerts and blocked transfers" Style="{StaticResource Text.SectionTitle}" />
