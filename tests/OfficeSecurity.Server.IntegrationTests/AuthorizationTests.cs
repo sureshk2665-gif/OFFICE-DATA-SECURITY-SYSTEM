@@ -55,7 +55,8 @@ public sealed class AuthorizationTests
 
         foreach (var (method, route, anonymous) in Endpoints(server).Where(e => !e.Anonymous))
         {
-            var url = route.Replace("{id:guid}", Guid.NewGuid().ToString(), StringComparison.Ordinal);
+            var url = System.Text.RegularExpressions.Regex.Replace(route, @"\{[A-Za-z]+:guid\}", _ => Guid.NewGuid().ToString());
+            Assert.DoesNotContain("{", url, StringComparison.Ordinal);
             using var request = new HttpRequestMessage(new HttpMethod(method), url) { Content = JsonContent.Create(new { }) };
             var response = await client.SendAsync(request);
             Assert.True(response.StatusCode == HttpStatusCode.Unauthorized, $"{method} {route} returned {response.StatusCode}");

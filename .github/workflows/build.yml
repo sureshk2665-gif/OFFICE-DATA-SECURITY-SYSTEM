@@ -31,6 +31,12 @@ jobs:
       - name: Test
         run: dotnet test OfficeSecurity.slnx --configuration Release --no-build --logger trx --results-directory TestResults
 
+      - name: Check the agent's Windows policy values against the Windows policy definitions (ADMX)
+        run: >
+          dotnet test tests/OfficeSecurity.Agent.UnitTests/OfficeSecurity.Agent.UnitTests.csproj
+          --configuration Release --no-build --filter "FullyQualifiedName~PolicyDefinitionTests"
+          --logger "console;verbosity=detailed"
+
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v4
@@ -114,7 +120,7 @@ jobs:
           wix build tests/windows/ocss-test-package.wxs -arch x64 -bindpath tests/windows -o "$env:RUNNER_TEMP\ocss-test.msi"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-      - name: Agent Windows Service end-to-end test (install, approve, policy, kill and recover, install software, uninstall)
+      - name: Agent Windows Service end-to-end test (install, approve, policy, kill and recover, security controls, install software, uninstall)
         shell: pwsh
         env:
           OCSS_AGENT_EXE: ${{ github.workspace }}\publish\OfficeSecurity-win-x64\Agent\OfficeSecurity.Agent.exe

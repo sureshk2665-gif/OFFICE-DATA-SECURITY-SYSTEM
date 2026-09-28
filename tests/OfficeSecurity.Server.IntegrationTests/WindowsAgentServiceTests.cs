@@ -4,6 +4,7 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Net.Sockets;
 using System.Text.RegularExpressions;
+using OfficeSecurity.Agent.Enforcement;
 using OfficeSecurity.Client.Core;
 using OfficeSecurity.Contracts;
 using OfficeSecurity.Policy;
@@ -72,7 +73,10 @@ public sealed partial class WindowsAgentServiceTests(ITestOutputHelper output)
                 return d!.Summary.IsOnline && d.Summary.AppliedPolicyVersion == d.Summary.LatestPolicyVersion && d.Hardware?.OsName is not null ? d : null;
             }, TimeSpan.FromSeconds(120), "computer online with policy applied");
             Assert.Contains("Windows", online.Hardware!.OsName, StringComparison.OrdinalIgnoreCase);
-            Assert.All(online.Controls, c => Assert.Equal(ControlState.NotImplemented, c.State));
+            // With the default policy (everything off) only the agent's own protection is active.
+            Assert.Equal(ControlState.Enforced, online.Controls.Single(c => c.Control == SecurityControl.AgentTamperProtection).State);
+            Assert.All(online.Controls.Where(c => c.Control != SecurityControl.AgentTamperProtection),
+                c => Assert.Contains(c.State, new[] { ControlState.NotConfigured, ControlState.NotImplemented }));
             output.WriteLine($"Online: {online.Hardware.OsName} {online.Hardware.OsBuild}, key storage in service, policy v{online.Summary.AppliedPolicyVersion}");
 
             // 3. A policy change reaches the service.
@@ -114,13 +118,18 @@ public sealed partial class WindowsAgentServiceTests(ITestOutputHelper output)
             }, TimeSpan.FromSeconds(90), "start-up events from both runs");
             Assert.Contains(events.Items, e => e.EventType == nameof(SecurityEventType.PolicyApplied));
 
-            // 8. Approved software installation with the real Windows installer (msiexec) and signature check.
+            // 8. Security controls: applied, verified by Windows itself, restored after tampering, lifted temporarily.
+            await EnforcementAsync(admin, defaultPolicy.Id, pending.Id);
+
+            // 9. Approved software installation with the real Windows installer (msiexec) and signature check,
+            //    while staff installations are blocked.
             await InstallTestMsiAsync(admin, pending.Id);
         }
         finally
         {
             var uninstall = await RunAsync(exe, "uninstall");
             Assert.Equal(0, uninstall);
+            RestoreFirewall();
             if (Environment.GetEnvironmentVariable(WindowsServiceFactAttribute.TestMsiVariable) is { Length: > 0 } msi && File.Exists(msi))
             {
                 await RunAsync(Path.Combine(Environment.SystemDirectory, "msiexec.exe"), "/x", msi, "/qn", "/norestart");
@@ -128,6 +137,171 @@ public sealed partial class WindowsAgentServiceTests(ITestOutputHelper output)
         }
 
         Assert.Contains("1060", await ScAsync("query", "OfficeSecurityAgent", allowFailure: true), StringComparison.Ordinal); // service does not exist
+
+        // 10. Uninstalling gave the computer back its normal behaviour.
+        if (OperatingSystem.IsWindows() && _blockedCurl is not null)
+        {
+            Assert.Null(HklmValue(UsbKey, "Deny_Read"));
+            Assert.Null(HklmValue(@"SOFTWARE\Policies\Microsoft\Edge\URLBlocklist", "1"));
+            Assert.Null(HklmValue(@"SOFTWARE\Policies\Microsoft\Windows\Installer", "DisableUserInstalls"));
+            Assert.Null(new WindowsFirewall().Find(FirewallEnforcer.RuleName(_blockedCurl)));
+            output.WriteLine("After uninstall: USB, website, installation and firewall settings made by the agent are gone.");
+        }
+    }
+
+    private const string UsbKey = @"SOFTWARE\Policies\Microsoft\Windows\RemovableStorageDevices\{53f5630d-b6bf-11d0-94f2-00a0c91efb8b}";
+
+    private string? _blockedCurl;
+    private FirewallProfiles _firewallWasOff;
+
+    private async Task EnforcementAsync(HttpClient admin, Guid policyId, Guid computerId)
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        // A copy of Windows' curl.exe that the policy blocks from the network; the original stays allowed.
+        var curl = Path.Combine(Environment.SystemDirectory, "curl.exe");
+        var folder = Directory.CreateTempSubdirectory("ocss-fw-").FullName;
+        _blockedCurl = Path.Combine(folder, "curl-blocked.exe");
+        File.Copy(curl, _blockedCurl);
+
+        // The build machine's firewall may be switched off; the agent never switches it on, so the test does.
+        _firewallWasOff = new WindowsFirewall().DisabledProfiles();
+        if (_firewallWasOff != FirewallProfiles.None)
+        {
+            output.WriteLine($"Test machine: turning on Windows Firewall for {_firewallWasOff} (restored at the end).");
+            await RunAsync("netsh.exe", "advfirewall", "set", "allprofiles", "state", "on");
+        }
+
+        await SavePolicyAsync(admin, policyId, s => s with
+        {
+            RemovableStorage = new RemovableStorageSettings { Mode = EnforcementMode.Enforce, BlockPortableDevices = true, BlockOpticalDrives = true },
+            SoftwareInstallation = new SoftwareInstallationSettings { BlockStaffInstalls = true },
+            Browser = new BrowserSettings { BlockedUrls = ["example.com"], DisablePrivateBrowsing = true },
+            Network = new NetworkSettings { BlockedApplicationPaths = [_blockedCurl] },
+        });
+
+        var detail = await WaitForControlsAsync(admin, computerId, "all controls applied and verified", c =>
+            c[SecurityControl.RemovableStorage] == ControlState.Enforced && c[SecurityControl.MobileDeviceTransfer] == ControlState.Enforced
+            && c[SecurityControl.SoftwareInstallation] == ControlState.PartiallyEnforced && c[SecurityControl.BrowserRestrictions] == ControlState.Enforced
+            && c[SecurityControl.NetworkRestrictions] == ControlState.Enforced && c[SecurityControl.AgentTamperProtection] == ControlState.Enforced);
+        foreach (var control in detail.Controls.Where(c => c.State != ControlState.NotImplemented && c.State != ControlState.NotConfigured))
+        {
+            output.WriteLine($"  {control.Control}: {control.State} — {control.Details}");
+        }
+
+        // The Windows settings are really there.
+        Assert.Equal(1, HklmValue(UsbKey, "Deny_Read"));
+        Assert.Equal(1, HklmValue(UsbKey, "Deny_Execute"));
+        Assert.Equal("example.com", HklmValue(@"SOFTWARE\Policies\Microsoft\Edge\URLBlocklist", "1"));
+        Assert.Equal(2, HklmValue(@"SOFTWARE\Policies\Microsoft\Windows\Installer", "DisableUserInstalls"));
+
+        // Effect 1: Microsoft Edge refuses the blocked site but still opens others.
+        var edge = new[] { Environment.SpecialFolder.ProgramFilesX86, Environment.SpecialFolder.ProgramFiles }
+            .Select(f => Path.Combine(Environment.GetFolderPath(f), @"Microsoft\Edge\Application\msedge.exe")).FirstOrDefault(File.Exists);
+        Assert.True(edge is not null, "Microsoft Edge is not installed on the test machine.");
+        var blockedPage = await EdgeDomAsync(edge, "https://example.com/");
+        var allowedPage = await EdgeDomAsync(edge, "https://www.microsoft.com/");
+        output.WriteLine($"Edge, blocked site: {(blockedPage.Contains("ERR_BLOCKED_BY_ADMINISTRATOR", StringComparison.Ordinal) ? "refused (ERR_BLOCKED_BY_ADMINISTRATOR)" : "NOT refused")}; allowed site: {allowedPage.Length} characters loaded");
+        Assert.Contains("ERR_BLOCKED_BY_ADMINISTRATOR", blockedPage, StringComparison.Ordinal);
+        Assert.DoesNotContain("ERR_BLOCKED_BY_ADMINISTRATOR", allowedPage, StringComparison.Ordinal);
+
+        // Effect 2: the blocked program cannot reach the internet; the same program elsewhere can.
+        var blockedExit = await RunAsync(_blockedCurl, "-sS", "-o", "NUL", "--max-time", "20", "https://www.microsoft.com/");
+        var allowedExit = await RunAsync(curl, "-sS", "-o", "NUL", "--max-time", "20", "https://www.microsoft.com/");
+        output.WriteLine($"Firewall: blocked program exit code {blockedExit}, allowed program exit code {allowedExit}");
+        Assert.NotEqual(0, blockedExit);
+        Assert.Equal(0, allowedExit);
+
+        // Tampering 1: an administrator deletes the USB block by hand -> restored and reported.
+        using (var key = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(UsbKey, writable: true)!)
+        {
+            key.DeleteValue("Deny_Read");
+        }
+
+        await WaitForAsync(() => Task.FromResult(HklmValue(UsbKey, "Deny_Read") is 1 ? (bool?)true : null), TimeSpan.FromSeconds(120), "deleted USB setting restored by the agent");
+
+        // Tampering 2: someone lets every signed-in user stop the service -> restored and reported.
+        var weak = (await ScAsync("sdshow", "OfficeSecurityAgent")).Trim().Split('\n').Last(l => l.StartsWith("D:", StringComparison.Ordinal)).Trim() + "(A;;RPWP;;;IU)";
+        await RunAsync(Path.Combine(Environment.SystemDirectory, "sc.exe"), "sdset", "OfficeSecurityAgent", weak);
+        Assert.Contains("(A;;RPWP;;;IU)", await ScAsync("sdshow", "OfficeSecurityAgent"), StringComparison.Ordinal);
+        await WaitForAsync(async () => (await ScAsync("sdshow", "OfficeSecurityAgent")).Contains("(A;;RPWP;;;IU)", StringComparison.Ordinal) ? null : (bool?)true,
+            TimeSpan.FromSeconds(120), "weakened service permissions restored by the agent");
+
+        var tamper = await WaitForAsync(async () =>
+        {
+            var e = await admin.GetFromJsonAsync<PagedResult<SecurityEventResponse>>($"{ApiRoutes.Events}?computerId={computerId}&pageSize=200");
+            var alerts = e!.Items.Where(x => x.EventType == nameof(SecurityEventType.PolicyTamperAttempt) && x.Severity == EventSeverities.Critical).ToList();
+            return alerts.Any(a => a.Details!.Contains("USB drive blocking", StringComparison.Ordinal)) && alerts.Any(a => a.Details!.Contains("service settings", StringComparison.Ordinal)) ? alerts : null;
+        }, TimeSpan.FromSeconds(90), "tampering alerts received by the server");
+        output.WriteLine($"Tampering alerts: {tamper.Count}");
+
+        // Temporary exception: USB drives allowed for this computer, then ended early.
+        var exemption = await (await admin.PostAsJsonAsync(ApiRoutes.ComputerExemptions(computerId),
+            new CreateExemptionRequest(nameof(SecurityControl.RemovableStorage), "End-to-end test", 30))).EnsureSuccessStatusCode().Content.ReadFromJsonAsync<ExemptionResponse>();
+        await WaitForControlsAsync(admin, computerId, "USB drives temporarily allowed", c => c[SecurityControl.RemovableStorage] == ControlState.TemporarilyAllowed);
+        Assert.Null(HklmValue(UsbKey, "Deny_Read"));
+        Assert.Equal(1, HklmValue(@$"SOFTWARE\Policies\Microsoft\Windows\RemovableStorageDevices\{{6AC27878-A6FA-4155-BA85-F98F491D4F33}}", "Deny_Read")); // phones still blocked
+        (await admin.DeleteAsync(new Uri(ApiRoutes.ComputerExemptionById(computerId, exemption!.Id), UriKind.Relative))).EnsureSuccessStatusCode();
+        await WaitForControlsAsync(admin, computerId, "USB blocking back after the exception ended", c => c[SecurityControl.RemovableStorage] == ControlState.Enforced);
+        Assert.Equal(1, HklmValue(UsbKey, "Deny_Read"));
+    }
+
+    private async Task<ComputerDetail> WaitForControlsAsync(HttpClient admin, Guid computerId, string what, Func<IReadOnlyDictionary<SecurityControl, ControlState>, bool> condition) =>
+        await WaitForAsync(async () =>
+        {
+            var d = await admin.GetFromJsonAsync<ComputerDetail>(ApiRoutes.ComputerById(computerId));
+            var states = d!.Controls.ToDictionary(c => c.Control, c => c.State);
+            return states.Count > 0 && condition(states) ? d : null;
+        }, TimeSpan.FromSeconds(150), what);
+
+    private static async Task<string> EdgeDomAsync(string edge, string url)
+    {
+        var profile = Directory.CreateTempSubdirectory("ocss-edge-").FullName;
+        var start = new ProcessStartInfo(edge) { RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false };
+        foreach (var argument in new[] { "--headless=new", "--disable-gpu", "--no-first-run", "--no-default-browser-check", $"--user-data-dir={profile}", "--dump-dom", url })
+        {
+            start.ArgumentList.Add(argument);
+        }
+
+        using var process = Process.Start(start)!;
+        var stdout = process.StandardOutput.ReadToEndAsync();
+        _ = process.StandardError.ReadToEndAsync();
+        try
+        {
+            await process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(90));
+        }
+        catch (TimeoutException)
+        {
+            process.Kill(entireProcessTree: true);
+        }
+
+        return await stdout;
+    }
+
+    private void RestoreFirewall()
+    {
+        foreach (var (profile, name) in new[] { (FirewallProfiles.Domain, "domainprofile"), (FirewallProfiles.Private, "privateprofile"), (FirewallProfiles.Public, "publicprofile") })
+        {
+            if (_firewallWasOff.HasFlag(profile))
+            {
+                using var p = Process.Start(new ProcessStartInfo("netsh.exe", $"advfirewall set {name} state off") { UseShellExecute = false, CreateNoWindow = true })!;
+                p.WaitForExit();
+            }
+        }
+    }
+
+    private static object? HklmValue(string key, string name)
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            return null;
+        }
+
+        using var k = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(key);
+        return k?.GetValue(name);
     }
 
     private async Task InstallTestMsiAsync(HttpClient admin, Guid computerId)

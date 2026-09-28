@@ -82,8 +82,13 @@ public sealed class FakeAgentServer : HttpMessageHandler
 
     public string TrustedKeyBase64 => Convert.ToBase64String(TrustedKey.ExportSubjectPublicKeyInfo());
 
+    /// <summary>The settings in the policies this server signs.</summary>
+    public PolicySettings Settings { get; set; } = new();
+
+    public IReadOnlyList<PolicyExemption> Exemptions { get; set; } = [];
+
     public SignedPolicyEnvelope Sign(long version, ECDsa? key = null, Guid? computerId = null) =>
-        new PolicySigner(key ?? TrustedKey).Sign(new PolicySettings().ToDocument(computerId ?? ComputerId, version, DateTimeOffset.UtcNow));
+        new PolicySigner(key ?? TrustedKey).Sign(Settings.ToDocument(computerId ?? ComputerId, version, DateTimeOffset.UtcNow, Exemptions));
 
     protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {
@@ -191,6 +196,9 @@ public sealed class AgentHarness : IDisposable
 
     public FakeInventory Inventory { get; } = new();
 
+    /// <summary>Security controls the runtime enforces (none by default).</summary>
+    public List<IEnforcer> Enforcers { get; } = [];
+
     public AgentRuntime Runtime { get; private set; }
 
     /// <summary>Simulates a service restart: a new runtime over the same data folder.</summary>
@@ -210,7 +218,7 @@ public sealed class AgentHarness : IDisposable
         ConfigStore,
         new FileDeviceKeyStore(Paths.FileKeyDirectory),
         Inventory,
-        new EnforcementCoordinator([], Clock),
+        new EnforcementCoordinator(Enforcers, Clock),
         Events,
         PolicyCache,
         Clock,
