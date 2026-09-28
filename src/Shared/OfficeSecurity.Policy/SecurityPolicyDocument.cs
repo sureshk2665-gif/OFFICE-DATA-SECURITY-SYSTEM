@@ -31,6 +31,10 @@ public sealed record SecurityPolicyDocument
 
     public FileProtectionSettings FileProtection { get; init; } = new();
 
+    public SignInAuditSettings SignInAudit { get; init; } = new();
+
+    public DiskEncryptionSettings DiskEncryption { get; init; } = new();
+
     public AgentSettings Agent { get; init; } = new();
 
     /// <summary>Time-boxed administrator-approved exceptions.</summary>
@@ -87,11 +91,29 @@ public sealed record ApplicationControlSettings
     /// <summary>Deny execution from folders a standard user can write to (Downloads, AppData, Temp...).</summary>
     public bool BlockUserWritableLocations { get; init; } = true;
 
-    /// <summary>Code-signing publishers allowed to run, e.g. "O=Adobe Inc., L=San Jose, S=California, C=US".</summary>
+    /// <summary>Code-signing publishers allowed to run. Not used yet (programs installed in Program Files are allowed).</summary>
     public IReadOnlyList<string> AllowedPublishers { get; init; } = [];
 
-    /// <summary>SHA-256 hashes (hex) of individually approved unsigned executables.</summary>
+    /// <summary>SHA-256 hashes (hex) of individually approved unsigned executables. Not used yet.</summary>
     public IReadOnlyList<string> AllowedFileHashes { get; init; } = [];
+
+    /// <summary>
+    /// Extra folders (besides Program Files and Windows) from which programs may run, e.g. "D:\CompanyApps\*".
+    /// Windows only honours a folder that standard users cannot write to.
+    /// </summary>
+    public IReadOnlyList<string> AllowedFolders { get; init; } = [];
+}
+
+/// <summary>Windows sign-in records (who signed in to the computer, failed sign-ins, sign-outs).</summary>
+public sealed record SignInAuditSettings
+{
+    public bool RecordWindowsSignIns { get; init; }
+}
+
+/// <summary>Disk encryption requirement (checked and reported; BitLocker is not switched on automatically).</summary>
+public sealed record DiskEncryptionSettings
+{
+    public bool RequireBitLocker { get; init; }
 }
 
 public sealed record SoftwareInstallationSettings

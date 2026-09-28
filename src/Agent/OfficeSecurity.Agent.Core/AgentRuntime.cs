@@ -52,6 +52,7 @@ public sealed partial class AgentRuntime : IDisposable
     private readonly Func<AgentConfig, AgentServerClient>? _clientFactory;
     private readonly Lock _clientGate = new();
     private readonly InstallationProcessor? _installations;
+    private readonly IPolicyEventCollector? _eventCollector;
     private Task? _installationTask;
 
     private AgentServerClient? _client;
@@ -76,8 +77,10 @@ public sealed partial class AgentRuntime : IDisposable
         ILogger<AgentRuntime> logger,
         AgentRuntimeOptions options,
         Func<AgentConfig, AgentServerClient>? clientFactory = null,
-        InstallationProcessor? installations = null)
+        InstallationProcessor? installations = null,
+        IPolicyEventCollector? eventCollector = null)
     {
+        _eventCollector = eventCollector;
         _installations = installations;
         _configStore = configStore;
         _keys = keys;
@@ -331,6 +334,8 @@ public sealed partial class AgentRuntime : IDisposable
             _nextInventory = now + _options.InventoryInterval;
         }
 
+        CollectWindowsEvents();
+
         var pending = _events.PeekPending(_options.EventUploadBatchSize);
         if (pending.Count > 0)
         {
@@ -412,6 +417,21 @@ public sealed partial class AgentRuntime : IDisposable
             }
         }
     }
+
+    private void CollectWindowsEvents()
+    {
+        try
+        {
+            _eventCollector?.Collect(CurrentPolicy);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException or System.ComponentModel.Win32Exception)
+        {
+            LogEventCollectionFailed(_logger, ex.Message);
+        }
+    }
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Windows events could not be read: {Message}")]
+    private static partial void LogEventCollectionFailed(ILogger logger, string message);
 
     private ControlState StateOf(SecurityControl control) =>
         Controls.FirstOrDefault(c => c.Control == control)?.State ?? ControlState.Unknown;

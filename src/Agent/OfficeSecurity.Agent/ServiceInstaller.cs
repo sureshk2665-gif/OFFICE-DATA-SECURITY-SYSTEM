@@ -48,6 +48,20 @@ internal static class ServiceInstaller
         Sc("failure", AgentPaths.ServiceName, "reset=", "86400", "actions=", "restart/5000/restart/5000/restart/30000");
         Sc("failureflag", AgentPaths.ServiceName, "1");
         Sc("sdset", AgentPaths.ServiceName, ServiceSecurity);
+        SetRuntimeExtractionFolder(Path.GetDirectoryName(executablePath)!);
+    }
+
+    /// <summary>
+    /// The single-file program unpacks its native libraries at start-up. They go into the protected install folder
+    /// (only administrators can write there, so Application Control allows them) instead of the Windows temp folder.
+    /// </summary>
+    private static void SetRuntimeExtractionFolder(string installDirectory)
+    {
+        var folder = Path.Combine(installDirectory, "runtime");
+        Directory.CreateDirectory(folder);
+        using var key = Microsoft.Win32.Registry.LocalMachine.OpenSubKey($@"SYSTEM\CurrentControlSet\Services\{AgentPaths.ServiceName}", writable: true)
+            ?? throw new InvalidOperationException("The service registration was not found.");
+        key.SetValue("Environment", new[] { "DOTNET_BUNDLE_EXTRACT_BASE_DIR=" + folder }, Microsoft.Win32.RegistryValueKind.MultiString);
     }
 
     public static void Start(TimeSpan timeout)

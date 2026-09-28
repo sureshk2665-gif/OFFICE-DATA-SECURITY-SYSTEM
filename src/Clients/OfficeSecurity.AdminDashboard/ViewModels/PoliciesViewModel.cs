@@ -71,6 +71,15 @@ public sealed partial class PoliciesViewModel(ShellViewModel shell, bool canWrit
     public partial bool BlockStaffInstalls { get; set; }
 
     [ObservableProperty]
+    public partial string AllowedFolders { get; set; } = string.Empty;
+
+    [ObservableProperty]
+    public partial bool RecordWindowsSignIns { get; set; }
+
+    [ObservableProperty]
+    public partial bool RequireBitLocker { get; set; }
+
+    [ObservableProperty]
     public partial string BlockedUrls { get; set; } = string.Empty;
 
     [ObservableProperty]
@@ -174,6 +183,9 @@ public sealed partial class PoliciesViewModel(ShellViewModel shell, bool canWrit
         BlockUserWritableLocations = s.ApplicationControl.BlockUserWritableLocations;
         DisablePrivateBrowsing = s.Browser.DisablePrivateBrowsing;
         BlockStaffInstalls = s.SoftwareInstallation.BlockStaffInstalls;
+        AllowedFolders = Lines(s.ApplicationControl.AllowedFolders);
+        RecordWindowsSignIns = s.SignInAudit.RecordWindowsSignIns;
+        RequireBitLocker = s.DiskEncryption.RequireBitLocker;
         BlockedUrls = Lines(s.Browser.BlockedUrls);
         AllowedUrls = Lines(s.Browser.AllowedUrls);
         AllowedWifiNetworks = Lines(s.Network.AllowedWifiNetworks);
@@ -189,7 +201,9 @@ public sealed partial class PoliciesViewModel(ShellViewModel shell, bool canWrit
         Agent = _loaded.Agent with { HeartbeatIntervalSeconds = HeartbeatSeconds },
         RemovableStorage = _loaded.RemovableStorage with { Mode = RemovableStorageMode, BlockPortableDevices = BlockPortableDevices, BlockOpticalDrives = BlockOpticalDrives },
         Bluetooth = _loaded.Bluetooth with { Mode = BluetoothMode },
-        ApplicationControl = _loaded.ApplicationControl with { Mode = ApplicationControlMode, BlockUserWritableLocations = BlockUserWritableLocations },
+        ApplicationControl = _loaded.ApplicationControl with { Mode = ApplicationControlMode, BlockUserWritableLocations = BlockUserWritableLocations, AllowedFolders = Split(AllowedFolders) },
+        SignInAudit = new SignInAuditSettings { RecordWindowsSignIns = RecordWindowsSignIns },
+        DiskEncryption = new DiskEncryptionSettings { RequireBitLocker = RequireBitLocker },
         SoftwareInstallation = _loaded.SoftwareInstallation with { BlockStaffInstalls = BlockStaffInstalls },
         Browser = _loaded.Browser with { DisablePrivateBrowsing = DisablePrivateBrowsing, BlockedUrls = Split(BlockedUrls), AllowedUrls = Split(AllowedUrls) },
         Network = _loaded.Network with { AllowedWifiNetworks = Split(AllowedWifiNetworks), BlockedApplicationPaths = Split(BlockedApplications) },

@@ -31,6 +31,18 @@ public sealed class PolicyDefinitionTests(ITestOutputHelper output)
         await CheckAsync("MSI.admx|AppxPackageManager.admx", new SoftwareInstallationEnforcer(Engine(out var r), NoEnforcementEvents.Instance, TimeProvider.System),
             s => s with { SoftwareInstallation = new() { BlockStaffInstalls = true } }, r);
 
+    [WindowsFact]
+    public async Task Ransomware_protection_values_match_the_windows_policy_definitions() =>
+        await CheckAsync("WindowsDefender.admx", new ControlledFolderAccessEnforcer(Engine(out var r), new ActiveDefender(), NoEnforcementEvents.Instance, TimeProvider.System),
+            s => s with { FileProtection = new() { ProtectedFolders = [new(@"D:\Company", false, true)] } }, r);
+
+    private sealed class ActiveDefender : IDefenderStatus
+    {
+        public string? InactiveReason() => null;
+
+        public int? EffectiveControlledFolderAccess() => 1;
+    }
+
     private static RegistryPolicyEngine Engine(out InMemoryPolicyRegistry registry)
     {
         registry = new InMemoryPolicyRegistry();
@@ -47,8 +59,8 @@ public sealed class PolicyDefinitionTests(ITestOutputHelper output)
         {
             var parts = id.Split('|');
             var match = definitions.FirstOrDefault(d => string.Equals(d.Key, parts[0], StringComparison.OrdinalIgnoreCase)
-                && string.Equals(d.ValueName, parts[1], StringComparison.OrdinalIgnoreCase)
-                && (d.Value is null || d.Value == (int)data));
+                && (d.ValueName == "*" || string.Equals(d.ValueName, parts[1], StringComparison.OrdinalIgnoreCase))
+                && (d.Value is null || (data is int number && d.Value == number)));
             var candidates = definitions.Where(d => string.Equals(d.Key, parts[0], StringComparison.OrdinalIgnoreCase) && string.Equals(d.ValueName, parts[1], StringComparison.OrdinalIgnoreCase))
                 .Select(d => $"{d.Value?.ToString(CultureInfo.InvariantCulture) ?? "any number"} = '{d.Display}' (policy {d.Policy})");
             Assert.True(match is not null, $@"HKLM\{parts[0]}\{parts[1]} = {data} is not defined in {files}. Defined: {string.Join(" | ", candidates)}");
@@ -81,6 +93,13 @@ public sealed class PolicyDefinitionTests(ITestOutputHelper output)
 
             foreach (var element in policy.Element(Ns + "elements")?.Elements() ?? [])
             {
+                if (element.Name.LocalName == "list" && (string?)element.Attribute("key") is { } listKey)
+                {
+                    // A list: any value name under its key (e.g. one value per protected folder).
+                    yield return new Definition(listKey, "*", null, name, display + " (list)");
+                    continue;
+                }
+
                 if ((string?)element.Attribute("valueName") is not { } elementValue)
                 {
                     continue;

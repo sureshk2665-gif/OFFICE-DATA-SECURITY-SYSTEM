@@ -64,6 +64,14 @@ public static class PolicyDocumentValidator
         CheckList(errors, "Allowed website", document.Browser.AllowedUrls, MaxUrlLength);
         CheckList(errors, "Wi-Fi network", document.Network.AllowedWifiNetworks, 32);
         CheckList(errors, "Blocked program", document.Network.BlockedApplicationPaths, 260);
+        CheckList(errors, "Allowed program folder", document.ApplicationControl.AllowedFolders, 260);
+        foreach (var folder in document.ApplicationControl.AllowedFolders)
+        {
+            if (!IsAbsoluteWindowsPath(folder.Replace("%OSDRIVE%", "C:", StringComparison.OrdinalIgnoreCase)) || folder.Contains('\'', StringComparison.Ordinal) || folder.Contains('"', StringComparison.Ordinal))
+            {
+                errors.Add($"Allowed program folder '{folder}' must be a full path such as D:\\CompanyApps\\*.");
+            }
+        }
 
         foreach (var exception in document.Exceptions)
         {

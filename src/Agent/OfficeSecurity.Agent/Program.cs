@@ -53,6 +53,20 @@ static void RunAgent(string[] args)
     builder.Services.AddSingleton<IEnforcer>(sp => new FirewallEnforcer(new WindowsFirewall(),
         new FileManagedSettingsStore(paths.DataDirectory, FileManagedSettingsStore.FirewallFile), sp.GetRequiredService<IEnforcementEvents>(), sp.GetRequiredService<TimeProvider>()));
     builder.Services.AddSingleton<IEnforcer>(sp => new ServiceProtectionEnforcer(sp.GetRequiredService<IEnforcementEvents>(), sp.GetRequiredService<TimeProvider>()));
+
+    // Phase 5 part 2: Application Control, Windows sign-in and file access records, ransomware protection, disk encryption.
+    var auditStore = new FileManagedSettingsStore(paths.DataDirectory, FileManagedSettingsStore.AuditFile);
+    var auditEngine = new AuditPolicyEngine(new WindowsAuditPolicy(), auditStore);
+    builder.Services.AddSingleton<IEnforcer>(sp => new AppControlEnforcer(new WindowsAppControl(Path.Combine(paths.DataDirectory, "appcontrol")),
+        paths.DataDirectory, sp.GetRequiredService<IEnforcementEvents>(), sp.GetRequiredService<TimeProvider>()));
+    builder.Services.AddSingleton<IEnforcer>(sp => new SignInAuditEnforcer(auditEngine, sp.GetRequiredService<IEnforcementEvents>(), sp.GetRequiredService<TimeProvider>()));
+    builder.Services.AddSingleton<IEnforcer>(sp => new FileAccessAuditEnforcer(auditEngine, new WindowsFolderAudit(), auditStore,
+        sp.GetRequiredService<IEnforcementEvents>(), sp.GetRequiredService<TimeProvider>()));
+    builder.Services.AddSingleton<IEnforcer>(sp => new ControlledFolderAccessEnforcer(sp.GetRequiredService<RegistryPolicyEngine>(), new WindowsDefenderStatus(),
+        sp.GetRequiredService<IEnforcementEvents>(), sp.GetRequiredService<TimeProvider>()));
+    builder.Services.AddSingleton<IEnforcer>(sp => new DiskEncryptionEnforcer(new WindowsDiskEncryption(), sp.GetRequiredService<TimeProvider>()));
+    builder.Services.AddSingleton<IPolicyEventCollector>(sp => new WindowsEventForwarder(new WindowsEventLogSource(), sp.GetRequiredService<PendingEventStore>(),
+        paths.DataDirectory, sp.GetRequiredService<TimeProvider>()));
     builder.Services.AddSingleton<EnforcementCoordinator>();
     builder.Services.AddSingleton(new PolicyCache(paths));
     builder.Services.AddSingleton(new AgentRuntimeOptions
@@ -67,7 +81,7 @@ static void RunAgent(string[] args)
         sp.GetRequiredService<AgentConfigStore>(), sp.GetRequiredService<IDeviceKeyStore>(), sp.GetRequiredService<IInventoryCollector>(),
         sp.GetRequiredService<EnforcementCoordinator>(), sp.GetRequiredService<PendingEventStore>(), sp.GetRequiredService<PolicyCache>(),
         sp.GetRequiredService<TimeProvider>(), sp.GetRequiredService<ILogger<AgentRuntime>>(), sp.GetRequiredService<AgentRuntimeOptions>(),
-        clientFactory: null, installations: sp.GetRequiredService<InstallationProcessor>()));
+        clientFactory: null, installations: sp.GetRequiredService<InstallationProcessor>(), eventCollector: sp.GetRequiredService<IPolicyEventCollector>()));
     builder.Services.AddSingleton<AgentLocalServer>(sp => new AgentLocalServer(sp.GetRequiredService<AgentRuntime>(), sp.GetRequiredService<ILogger<AgentLocalServer>>()));
     builder.Services.AddHostedService<AgentWorker>();
 

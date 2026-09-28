@@ -301,9 +301,18 @@
               <TextBlock Text="Bluetooth (not available yet — no effect)" Style="{StaticResource Text.SectionTitle}" Margin="0,16,0,4" />
               <ComboBox ItemsSource="{Binding BluetoothModes}" SelectedItem="{Binding BluetoothMode}" Width="200" HorizontalAlignment="Left" />
 
-              <TextBlock Text="Unapproved programs (Application Control — not available yet, no effect)" Style="{StaticResource Text.SectionTitle}" Margin="0,16,0,4" TextWrapping="Wrap" />
+              <TextBlock Text="Programs staff bring in (Application Control)" Style="{StaticResource Text.SectionTitle}" Margin="0,16,0,4" TextWrapping="Wrap" />
               <ComboBox ItemsSource="{Binding EnforcementModes}" SelectedItem="{Binding ApplicationControlMode}" Width="160" HorizontalAlignment="Left" />
-              <CheckBox Content="Block programs started from Downloads, AppData and other user folders" IsChecked="{Binding BlockUserWritableLocations}" Margin="0,6,0,0" />
+              <TextBlock Style="{StaticResource Text.Muted}" TextWrapping="Wrap" Margin="0,4,0,0"
+                         Text="Allowed: Windows, programs signed by Microsoft (Office, Teams, OneDrive...) and programs installed in Program Files. Everything else — programs in Downloads, on the Desktop, in AppData or on a USB drive — is blocked. Use Audit for a few days first: the Security Events page then shows every program that WOULD be blocked. Needs Windows 11 22H2 or later." />
+              <TextBlock Text="Extra folders where programs may run (optional, one per line, e.g. D:\CompanyApps\*; only folders staff cannot write to)" Style="{StaticResource Text.Label}" TextWrapping="Wrap" />
+              <TextBox Text="{Binding AllowedFolders, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True" Height="50" VerticalScrollBarVisibility="Auto" />
+
+              <TextBlock Text="Windows sign-ins" Style="{StaticResource Text.SectionTitle}" Margin="0,16,0,4" />
+              <CheckBox Content="Record who signs in to Windows, failed sign-ins and sign-outs" IsChecked="{Binding RecordWindowsSignIns}" />
+
+              <TextBlock Text="Disk encryption" Style="{StaticResource Text.SectionTitle}" Margin="0,16,0,4" />
+              <CheckBox Content="Require BitLocker on all fixed drives (checked and reported; not switched on automatically)" IsChecked="{Binding RequireBitLocker}" />
             </StackPanel>
 
             <StackPanel Grid.Column="2">
@@ -322,11 +331,13 @@
               <TextBlock Text="Programs without network access (full path, one per line, e.g. C:\Program Files\Dropbox\Client\Dropbox.exe)" Style="{StaticResource Text.Label}" TextWrapping="Wrap" />
               <TextBox Text="{Binding BlockedApplications, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True" Height="50" VerticalScrollBarVisibility="Auto" />
 
-              <TextBlock Text="Company folders (not available yet — no effect)" Style="{StaticResource Text.SectionTitle}" Margin="0,16,0,4" />
+              <TextBlock Text="Company folders" Style="{StaticResource Text.SectionTitle}" Margin="0,16,0,4" />
               <TextBlock Text="Protected folders (full path, one per line, e.g. D:\Company)" Style="{StaticResource Text.Label}" />
               <TextBox Text="{Binding ProtectedFolders, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True" Height="50" VerticalScrollBarVisibility="Auto" />
               <CheckBox Content="Record who opens files in these folders" IsChecked="{Binding AuditProtectedFolders}" Margin="0,6,0,0" />
-              <CheckBox Content="Ransomware protection (Windows Controlled Folder Access)" IsChecked="{Binding RansomwareProtection}" Margin="0,4,0,0" />
+              <CheckBox Content="Ransomware protection (Windows Controlled Folder Access; needs Microsoft Defender as the antivirus)" IsChecked="{Binding RansomwareProtection}" Margin="0,4,0,0" />
+              <TextBlock Style="{StaticResource Text.Muted}" TextWrapping="Wrap" Margin="0,4,0,0"
+                         Text="Records show that a file was opened, changed or deleted, by whom and with which program; they cannot show where the content went afterwards. Ransomware protection lets only trusted programs change files in these folders." />
             </StackPanel>
           </Grid>
           <TextBlock Style="{StaticResource Text.Muted}" Margin="0,12,0,0" TextWrapping="Wrap"

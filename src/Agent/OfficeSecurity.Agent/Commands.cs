@@ -137,7 +137,12 @@ internal static class Commands
         // Give the computer back its normal Windows behaviour: remove exactly the settings the agent made.
         var settings = new RegistryPolicyEngine(new WindowsPolicyRegistry(), new FileManagedSettingsStore(paths.DataDirectory)).RemoveAll();
         var rules = FirewallEnforcer.RemoveAll(new WindowsFirewall(), new FileManagedSettingsStore(paths.DataDirectory, FileManagedSettingsStore.FirewallFile));
-        Console.WriteLine($"Removed the protections set by the agent ({settings} Windows setting(s), {rules} firewall rule(s)).");
+        var auditStore = new FileManagedSettingsStore(paths.DataDirectory, FileManagedSettingsStore.AuditFile);
+        var folders = FileAccessAuditEnforcer.RemoveAll(new WindowsFolderAudit(), auditStore);
+        var audit = new AuditPolicyEngine(new WindowsAuditPolicy(), auditStore).RemoveAll();
+        var appControl = AppControlEnforcer.RemoveAll(new WindowsAppControl(Path.Combine(paths.DataDirectory, "appcontrol")), paths.DataDirectory);
+        Console.WriteLine($"Removed the protections set by the agent ({settings} Windows setting(s), {rules} firewall rule(s), {audit} audit setting(s), " +
+            $"{folders} folder audit entr(ies){(appControl ? ", the Application Control policy" : string.Empty)}).");
         var config = new AgentConfigStore(paths).Load();
         if (config.KeyName is not null)
         {

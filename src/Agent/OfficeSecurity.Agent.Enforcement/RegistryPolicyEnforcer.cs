@@ -71,6 +71,9 @@ public abstract class RegistryPolicyEnforcer(RegistryPolicyEngine engine, IEnfor
                 string.Create(CultureInfo.InvariantCulture, $"Temporarily allowed by an administrator until {exemption.ExpiresAtUtc:yyyy-MM-dd HH:mm} UTC: {exemption.Reason}"), now);
         }
 
-        return new ControlStatus(Control, plan.StateWhenApplied, plan.Detail, now);
+        return Review(new ControlStatus(Control, plan.StateWhenApplied, plan.Detail, now));
     }
+
+    /// <summary>Lets a control adjust its verified status with an additional check (e.g. the effective state).</summary>
+    protected virtual ControlStatus Review(ControlStatus status) => status;
 }

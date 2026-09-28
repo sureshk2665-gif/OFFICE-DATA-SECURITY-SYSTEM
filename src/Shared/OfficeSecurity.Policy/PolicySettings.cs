@@ -20,6 +20,10 @@ public sealed record PolicySettings
 
     public FileProtectionSettings FileProtection { get; init; } = new();
 
+    public SignInAuditSettings SignInAudit { get; init; } = new();
+
+    public DiskEncryptionSettings DiskEncryption { get; init; } = new();
+
     public AgentSettings Agent { get; init; } = new();
 
     public SecurityPolicyDocument ToDocument(Guid computerId, long version, DateTimeOffset issuedAtUtc, IReadOnlyList<PolicyExemption>? exemptions = null) => new()
@@ -34,6 +38,8 @@ public sealed record PolicySettings
         Network = Network,
         Browser = Browser,
         FileProtection = FileProtection,
+        SignInAudit = SignInAudit,
+        DiskEncryption = DiskEncryption,
         Agent = Agent,
         Exceptions = exemptions ?? [],
     };

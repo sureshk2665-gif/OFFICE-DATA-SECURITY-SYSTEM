@@ -124,9 +124,14 @@ public sealed partial class WindowsAgentServiceTests(ITestOutputHelper output)
             // 9. Approved software installation with the real Windows installer (msiexec) and signature check,
             //    while staff installations are blocked.
             await InstallTestMsiAsync(admin, pending.Id);
+
+            // 10. Part 2: Windows sign-in records, file access records, ransomware protection, BitLocker check and
+            //     Application Control (audit, then enforce, then off).
+            await Part2Async(admin, defaultPolicy.Id, pending.Id);
         }
         finally
         {
+            await RunAsync("net.exe", "user", TestUser, "/delete");
             var uninstall = await RunAsync(exe, "uninstall");
             Assert.Equal(0, uninstall);
             RestoreFirewall();
@@ -253,6 +258,145 @@ public sealed partial class WindowsAgentServiceTests(ITestOutputHelper output)
         await WaitForControlsAsync(admin, computerId, "USB blocking back after the exception ended", c => c[SecurityControl.RemovableStorage] == ControlState.Enforced);
         Assert.Equal(1, HklmValue(UsbKey, "Deny_Read"));
     }
+
+    private const string TestUser = "ocsstest";
+
+    private async Task Part2Async(HttpClient admin, Guid policyId, Guid computerId)
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        // Test material: a company folder with a file, a probe program (a copy of an unsigned program) in a user
+        // folder and in Program Files, and a local Windows account.
+        var company = Directory.CreateDirectory(@"C:\OcssTest\Company").FullName;
+        var document = Path.Combine(company, "salaries.txt");
+        File.WriteAllText(document, "confidential");
+        var agentExe = Environment.GetEnvironmentVariable(WindowsServiceFactAttribute.AgentExeVariable)!;
+        var userProbe = Path.Combine(Directory.CreateTempSubdirectory("ocss-appctl-").FullName, "probe.exe");
+        File.Copy(agentExe, userProbe);
+        var installedProbe = Path.Combine(Directory.CreateDirectory(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "OcssProbe")).FullName, "probe.exe");
+        File.Copy(agentExe, installedProbe, overwrite: true);
+        var password = "Ocss-" + Guid.NewGuid().ToString("N")[..12] + "!9";
+        Assert.Equal(0, await RunAsync("net.exe", "user", TestUser, password, "/add"));
+
+        // Folders this CI machine needs while Application Control is enforced (the test program and the build runner).
+        var runner = Process.GetProcessesByName("Runner.Worker").Select(p => Path.GetDirectoryName(Path.GetDirectoryName(p.MainModule!.FileName))).FirstOrDefault();
+        var ciFolders = new[] { AppContext.BaseDirectory.TrimEnd('\\') + @"\*", runner is null ? null : runner + @"\*" }.OfType<string>().ToList();
+        output.WriteLine("Extra allowed folders for the CI machine: " + string.Join("; ", ciFolders));
+
+        await SavePolicyAsync(admin, policyId, s => s with
+        {
+            SignInAudit = new SignInAuditSettings { RecordWindowsSignIns = true },
+            FileProtection = new FileProtectionSettings { ProtectedFolders = [new ProtectedFolder(company, AuditAccess: true, ControlledFolderAccess: true)] },
+            DiskEncryption = new DiskEncryptionSettings { RequireBitLocker = true },
+            ApplicationControl = new ApplicationControlSettings { Mode = EnforcementMode.Audit, AllowedFolders = ciFolders },
+        });
+
+        var detail = await WaitForControlsAsync(admin, computerId, "part 2 controls applied", c =>
+            c[SecurityControl.LoginAudit] == ControlState.Enforced && c[SecurityControl.FileAccessAudit] == ControlState.Enforced
+            && c[SecurityControl.ApplicationControl] == ControlState.AuditOnly
+            && c[SecurityControl.ControlledFolderAccess] is ControlState.Enforced or ControlState.NotSupportedOnEdition or ControlState.PartiallyEnforced
+            && c[SecurityControl.DiskEncryption] is not ControlState.Unknown and not ControlState.NotImplemented and not ControlState.NotConfigured);
+        foreach (var control in detail.Controls.Where(c => c.Control is SecurityControl.LoginAudit or SecurityControl.FileAccessAudit or SecurityControl.ApplicationControl
+                     or SecurityControl.ControlledFolderAccess or SecurityControl.DiskEncryption))
+        {
+            output.WriteLine($"  {control.Control}: {control.State} — {control.Details}");
+        }
+
+        // Sign-in records: one failed and one successful Windows sign-in of the test account.
+        Assert.False(TryLogon(TestUser, "wrong-password"));
+        Assert.True(TryLogon(TestUser, password), "The test account could not sign in.");
+        await WaitForEventAsync(admin, computerId, SecurityEventType.FailedLogin, TestUser, "failed Windows sign-in reported");
+        await WaitForEventAsync(admin, computerId, SecurityEventType.SuccessfulLogin, TestUser, "successful Windows sign-in reported");
+
+        // File access records.
+        _ = File.ReadAllText(document);
+        await WaitForEventAsync(admin, computerId, SecurityEventType.ProtectedFileAccess, "salaries.txt", "file access in the protected folder reported");
+
+        // Application Control, audit mode: the probe still runs and is reported as "would be blocked".
+        Assert.Equal(0, await RunAsync(userProbe, "help"));
+        await WaitForEventAsync(admin, computerId, SecurityEventType.UnauthorizedApplicationBlocked, "probe.exe", "audit-mode report for the probe program");
+
+        // Enforce: the probe in the user folder is refused; the copy in Program Files runs.
+        await SavePolicyAsync(admin, policyId, s => s with { ApplicationControl = s.ApplicationControl with { Mode = EnforcementMode.Enforce } });
+        await WaitForControlsAsync(admin, computerId, "Application Control enforced", c => c[SecurityControl.ApplicationControl] == ControlState.Enforced);
+        var blocked = await TryRunAsync(userProbe, "help");
+        var allowed = await TryRunAsync(installedProbe, "help");
+        output.WriteLine($"Application Control enforced: user-folder program → {blocked}; Program Files program → {allowed}");
+        Assert.NotEqual("exit 0", blocked);
+        Assert.Equal("exit 0", allowed);
+        await WaitForEventAsync(admin, computerId, SecurityEventType.UnauthorizedApplicationBlocked, "Blocked by Application Control", "block reported");
+
+        // The agent itself still starts under enforcement.
+        await ScAsync("stop", "OfficeSecurityAgent");
+        await WaitForAsync(async () => (await ScAsync("query", "OfficeSecurityAgent")).Contains("STOPPED", StringComparison.Ordinal) ? (bool?)true : null, TimeSpan.FromSeconds(60), "service stopped");
+        await ScAsync("start", "OfficeSecurityAgent");
+        await WaitForAsync(async () => await ServicePidAsync() is not 0 ? (bool?)true : null, TimeSpan.FromSeconds(60), "service running again under Application Control");
+        await WaitForControlsAsync(admin, computerId, "agent reporting again after the restart", c => c[SecurityControl.ApplicationControl] == ControlState.Enforced);
+
+        // Off: the policy is removed again.
+        await SavePolicyAsync(admin, policyId, s => s with { ApplicationControl = new ApplicationControlSettings() });
+        await WaitForControlsAsync(admin, computerId, "Application Control switched off", c => c[SecurityControl.ApplicationControl] == ControlState.NotConfigured);
+        var afterOff = await TryRunAsync(userProbe, "help");
+        output.WriteLine($"After switching Application Control off: user-folder program → {afterOff}");
+        Assert.Equal("exit 0", afterOff);
+    }
+
+    private async Task WaitForEventAsync(HttpClient admin, Guid computerId, SecurityEventType type, string contains, string what) =>
+        await WaitForAsync(async () =>
+        {
+            var e = await admin.GetFromJsonAsync<PagedResult<SecurityEventResponse>>($"{ApiRoutes.Events}?computerId={computerId}&pageSize=200");
+            var match = e!.Items.FirstOrDefault(x => x.EventType == type.ToString() && x.Details!.Contains(contains, StringComparison.OrdinalIgnoreCase));
+            if (match is not null)
+            {
+                output.WriteLine($"  event {match.EventType} ({match.Severity}): {match.Details}");
+            }
+
+            return match;
+        }, TimeSpan.FromSeconds(120), what);
+
+    private static async Task<string> TryRunAsync(string exe, params string[] arguments)
+    {
+        try
+        {
+            var start = new ProcessStartInfo(exe) { RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false };
+            foreach (var argument in arguments)
+            {
+                start.ArgumentList.Add(argument);
+            }
+
+            using var process = Process.Start(start)!;
+            _ = process.StandardOutput.ReadToEndAsync();
+            _ = process.StandardError.ReadToEndAsync();
+            await process.WaitForExitAsync().WaitAsync(TimeSpan.FromMinutes(2));
+            return $"exit {process.ExitCode}";
+        }
+        catch (System.ComponentModel.Win32Exception ex)
+        {
+            return $"refused by Windows: {ex.Message} ({ex.NativeErrorCode})";
+        }
+    }
+
+    private static bool TryLogon(string user, string password)
+    {
+        if (!LogonUser(user, ".", password, 2 /* interactive */, 0, out var token))
+        {
+            return false;
+        }
+
+        CloseHandle(token);
+        return true;
+    }
+
+    [System.Runtime.InteropServices.DllImport("advapi32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode, SetLastError = true)]
+    [return: System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.Bool)]
+    private static extern bool LogonUser(string user, string domain, string password, int logonType, int logonProvider, out IntPtr token);
+
+    [System.Runtime.InteropServices.DllImport("kernel32.dll")]
+    [return: System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.Bool)]
+    private static extern bool CloseHandle(IntPtr handle);
 
     private async Task<ComputerDetail> WaitForControlsAsync(HttpClient admin, Guid computerId, string what, Func<IReadOnlyDictionary<SecurityControl, ControlState>, bool> condition) =>
         await WaitForAsync(async () =>
