@@ -252,6 +252,31 @@ jobs:
           path: publish/OfficeSecurity-win-x64
           retention-days: 30
 
+  setup-kit-quick-check:
+    # Fast check of MAKE-SETUP.bat with small stand-in files (the full kit is tested in "build").
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Make a setup program from stand-in files
+        shell: pwsh
+        run: |
+          $kit = "D:\ocss kit (test)"
+          New-Item -ItemType Directory -Force "$kit\files\App", "$kit\files\Server", "$kit\files\Agent" | Out-Null
+          Copy-Item installer/setup-kit/MAKE-SETUP.bat $kit
+          Copy-Item installer/setup-kit/files/* "$kit\files"
+          foreach ($f in "App\OfficeSecurity.exe", "Server\OfficeSecurity.Server.exe", "Agent\OfficeSecurity.Agent.exe") { Copy-Item "$env:SystemRoot\System32\whoami.exe" "$kit\files\$f" }
+          $env:OCSS_NO_PAUSE = "1"
+          cmd.exe /c "`"$kit\MAKE-SETUP.bat`""
+          if ($LASTEXITCODE -ne 0) { throw "MAKE-SETUP.bat failed ($LASTEXITCODE)" }
+          $setup = "$kit\OfficeSecurity-Setup.exe"
+          if (-not (Test-Path $setup)) { throw "no setup program" }
+          # The setup program must unpack its files and run a command next to them.
+          $out = Join-Path $env:RUNNER_TEMP "unpacked.txt"
+          $p = Start-Process $setup -ArgumentList "/Q", "/C:`"cmd.exe /c dir /b > $out`"" -Wait -PassThru
+          Write-Host "exit code $($p.ExitCode)"; Get-Content $out
+          foreach ($name in "payload.zip", "install.ps1", "setup.cmd") { if (-not (Select-String -Path $out -SimpleMatch $name -Quiet)) { throw "$name was not unpacked" } }
+          Write-Host "Setup program packs and unpacks correctly."
+
   secret-scan:
     runs-on: ubuntu-latest
     steps:

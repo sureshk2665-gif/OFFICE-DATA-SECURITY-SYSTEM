@@ -90,9 +90,18 @@ set "SED=%WORK%\setup.sed"
 
 echo  [3/3] Building OfficeSecurity-Setup.exe ^(1-3 minutes^)...
 if exist "%OUT%" del /f /q "%OUT%"
-"%SystemRoot%\System32\iexpress.exe" /N /Q "%WORK%\setup.sed"
+rem "start /wait" makes sure this waits for IExpress (a Windows program) to finish.
+start "IExpress" /wait "%SystemRoot%\System32\iexpress.exe" /N /Q "%WORK%\setup.sed"
+rem IExpress can hand the work to a second copy of itself: wait until none is left (up to 10 minutes).
+for /l %%N in (1,1,120) do (
+  tasklist /fi "imagename eq iexpress.exe" 2>nul | find /i "iexpress.exe" >nul && ping -n 6 127.0.0.1 >nul
+)
 if not exist "%OUT%" (
   echo  ERROR: IExpress did not create the setup program.
+  echo  Instructions used:
+  type "%SED%"
+  echo  Work folder:
+  dir "%WORK%"
   goto :failed
 )
 
