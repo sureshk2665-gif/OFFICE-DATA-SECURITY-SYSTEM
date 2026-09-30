@@ -145,6 +145,106 @@ jobs:
           path: tests/OfficeSecurity.Server.IntegrationTests/bin/Release/net10.0/reports/
           if-no-files-found: warn
 
+      - name: Build the combined program (OfficeSecurity.exe) and the setup kit
+        shell: pwsh
+        run: |
+          $kit = "publish/OfficeSecurity-Setup-Kit"
+          dotnet publish src/Clients/OfficeSecurity.Desktop --configuration Release --runtime win-x64 --self-contained true `
+            -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true `
+            -p:EnableCompressionInSingleFile=true -p:DebugType=none `
+            --output "$kit/files/App"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          # Left over from the two built-in parts; the single OfficeSecurity.exe does not use them.
+          Remove-Item "$kit/files/App/*.runtimeconfig.json"
+          Copy-Item -Recurse publish/OfficeSecurity-win-x64/Server "$kit/files/Server"
+          Copy-Item -Recurse publish/OfficeSecurity-win-x64/Agent "$kit/files/Agent"
+          Copy-Item installer/setup-kit/files/* "$kit/files/"
+          Copy-Item installer/setup-kit/MAKE-SETUP.bat, installer/setup-kit/READ-ME-FIRST.txt $kit
+          Get-ChildItem -Recurse -File $kit | ForEach-Object { "{0,12:N0}  {1}" -f $_.Length, $_.FullName.Substring((Resolve-Path $kit).Path.Length) }
+
+      - name: Screen self-test (combined program, both sign-ins)
+        shell: pwsh
+        run: |
+          $log = Join-Path $env:RUNNER_TEMP "combined-smoke.log"
+          $p = Start-Process -FilePath "publish/OfficeSecurity-Setup-Kit/files/App/OfficeSecurity.exe" -ArgumentList "--smoke-test", "`"$log`"" -PassThru -Wait
+          Write-Host "---- OfficeSecurity.exe (exit code $($p.ExitCode))"
+          if (Test-Path $log) { Get-Content $log } else { Write-Host "No log written." }
+          if ($p.ExitCode -ne 0) { exit 1 }
+
+      - name: Upload the setup kit (zip of ready files + MAKE-SETUP.bat)
+        uses: actions/upload-artifact@v4
+        with:
+          name: OfficeSecurity-Setup-Kit
+          path: publish/OfficeSecurity-Setup-Kit
+          retention-days: 30
+
+      - name: Make OfficeSecurity-Setup.exe with MAKE-SETUP.bat (IExpress)
+        shell: cmd
+        env:
+          OCSS_NO_PAUSE: "1"
+        run: call publish\OfficeSecurity-Setup-Kit\MAKE-SETUP.bat
+
+      - name: Setup test on Windows (main office computer install, update, refused staff install, uninstall)
+        shell: pwsh
+        run: |
+          $setup = (Resolve-Path publish/OfficeSecurity-Setup-Kit/OfficeSecurity-Setup.exe).Path
+          Write-Host ("Setup program size: {0:N0} bytes" -f (Get-Item $setup).Length)
+          $root = Join-Path $env:ProgramFiles "OfficeSecurity"
+          $data = Join-Path $env:ProgramData "OfficeSecurity\Server"
+          $logs = @()
+          function Run-Setup([string] $name, [string] $arguments) {
+            $log = Join-Path $env:RUNNER_TEMP "setup-$name.log"
+            $script:logs += $log
+            $p = Start-Process -FilePath $setup -ArgumentList "/Q", "/C:`"cmd.exe /c setup.cmd $arguments -Quiet -LogFile $log`"" -Wait -PassThru
+            Write-Host "setup ($name) exit code: $($p.ExitCode)"
+          }
+          function Check([bool] $ok, [string] $what) { if (-not $ok) { throw "FAILED: $what" } else { Write-Host "PASS: $what" } }
+          function Health { try { (Invoke-RestMethod -Uri "https://localhost:5443/api/v1/health" -SkipCertificateCheck).status } catch { $null } }
+          try {
+            Run-Setup "main" "-Role Main"
+            $service = Get-Service OfficeSecurityServer -ErrorAction SilentlyContinue
+            Check ($null -ne $service -and $service.Status -eq 'Running') "server runs as a Windows service"
+            Check ($service.StartType -eq 'Automatic') "server service starts with Windows"
+            Check ($null -ne (Health)) "server answers on https://localhost:5443"
+            Check ((Invoke-RestMethod -Uri "https://localhost:5443/api/v1/setup/status" -SkipCertificateCheck).firstAdminSetupRequired) "first administrator setup is offered"
+            Check ($null -ne (Get-NetFirewallRule -DisplayName "Office Security Server (TCP 5443)" -ErrorAction SilentlyContinue)) "firewall rule for TCP 5443 exists"
+            Check (Test-Path "$root\App\OfficeSecurity.exe") "combined program installed"
+            Check ((Get-Content "$root\App\role.txt").Trim() -eq "MAIN") "installed as main office computer"
+            Check (Test-Path (Join-Path ([Environment]::GetFolderPath('CommonDesktopDirectory')) "Office Security.lnk")) "desktop shortcut"
+            Check (Test-Path (Join-Path ([Environment]::GetFolderPath('CommonPrograms')) "Office Security.lnk")) "Start menu shortcut"
+            $entry = Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\OfficeSecurity" -ErrorAction SilentlyContinue
+            Check ($null -ne $entry -and $entry.DisplayName -eq "Office Computer Security") "listed in Windows Settings > Apps"
+            $setupCode = Get-Content (Join-Path $data "FIRST-ADMIN-SETUP-CODE.txt") -Raw
+
+            Run-Setup "update" "-Role Main"
+            Check ((Get-Service OfficeSecurityServer).Status -eq 'Running') "server runs again after an update"
+            Check ($null -ne (Health)) "server answers after an update"
+            Check ((Get-Content (Join-Path $data "FIRST-ADMIN-SETUP-CODE.txt") -Raw) -eq $setupCode) "update kept the server data"
+
+            Run-Setup "staff-wrong-code" "-Role Staff -Server localhost -PairingCode 0000-0000-0000-0000-0000 -EnrollmentCode WRONG"
+            Check ($null -eq (Get-Service OfficeSecurityAgent -ErrorAction SilentlyContinue)) "staff install with a wrong pairing code installs no agent"
+            Check ((Get-Content "$root\App\role.txt").Trim() -eq "MAIN") "refused staff install changed nothing"
+
+            & powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$root\Setup\install.ps1" -Uninstall -Quiet -LogFile (Join-Path $env:RUNNER_TEMP "setup-uninstall.log")
+            $logs += (Join-Path $env:RUNNER_TEMP "setup-uninstall.log")
+            Check ($null -eq (Get-Service OfficeSecurityServer -ErrorAction SilentlyContinue)) "uninstall removed the server service"
+            Check ($null -eq (Get-NetFirewallRule -DisplayName "Office Security Server (TCP 5443)" -ErrorAction SilentlyContinue)) "uninstall removed the firewall rule"
+            Check (-not (Test-Path "$root\App")) "uninstall removed the program files"
+            Check (-not (Test-Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\OfficeSecurity")) "uninstall removed the Apps entry"
+            Check (Test-Path (Join-Path $data "office-security.db")) "uninstall kept the server data"
+            Write-Host "Setup test passed."
+          }
+          finally {
+            foreach ($log in $logs) { Write-Host "---- $log"; Get-Content $log -ErrorAction SilentlyContinue }
+          }
+
+      - name: Upload the setup program
+        uses: actions/upload-artifact@v4
+        with:
+          name: OfficeSecurity-Setup
+          path: publish/OfficeSecurity-Setup-Kit/OfficeSecurity-Setup.exe
+          retention-days: 30
+
       - name: Upload executables
         uses: actions/upload-artifact@v4
         with:

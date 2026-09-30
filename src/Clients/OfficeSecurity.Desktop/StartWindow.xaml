@@ -1,0 +1,41 @@
+<Window x:Class="OfficeSecurity.Desktop.StartWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Office Computer Security"
+        Width="760" Height="480" MinWidth="560" MinHeight="420"
+        WindowStartupLocation="CenterScreen"
+        Background="{StaticResource Brush.Background}"
+        FontFamily="{StaticResource Font.Main}">
+  <Grid Margin="32,28">
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="*" />
+      <RowDefinition Height="Auto" />
+    </Grid.RowDefinitions>
+    <StackPanel>
+      <TextBlock Text="Office Computer Security" Style="{StaticResource Text.PageTitle}" />
+      <TextBlock Text="Choose how you want to sign in." Style="{StaticResource Text.Muted}" Margin="0,4,0,20" />
+    </StackPanel>
+
+    <UniformGrid x:Name="Choices" Grid.Row="1" Rows="1">
+      <Border x:Name="AdminCard" Style="{StaticResource Card}" Margin="0,0,8,0">
+        <DockPanel LastChildFill="False">
+          <TextBlock DockPanel.Dock="Top" Text="Administrator" Style="{StaticResource Text.SectionTitle}" />
+          <TextBlock DockPanel.Dock="Top" TextWrapping="Wrap" Style="{StaticResource Text.Muted}" Margin="0,8,0,0"
+                     Text="Manage computers, staff accounts, security policies, software, alerts and reports. Needs your password and the 6-digit code from your authenticator app." />
+          <Button DockPanel.Dock="Bottom" Content="Administrator sign-in" Style="{StaticResource Button.Primary}" Click="OnAdministrator" AutomationProperties.AutomationId="AdminSignIn" />
+        </DockPanel>
+      </Border>
+      <Border x:Name="StaffCard" Style="{StaticResource Card}" Margin="8,0,0,0">
+        <DockPanel LastChildFill="False">
+          <TextBlock DockPanel.Dock="Top" Text="Staff" Style="{StaticResource Text.SectionTitle}" />
+          <TextBlock DockPanel.Dock="Top" TextWrapping="Wrap" Style="{StaticResource Text.Muted}" Margin="0,8,0,0"
+                     Text="Sign in with your employee code, see this computer's protection status and ask for software." />
+          <Button DockPanel.Dock="Bottom" Content="Staff sign-in" Style="{StaticResource Button.Primary}" Click="OnStaff" AutomationProperties.AutomationId="StaffSignIn" />
+        </DockPanel>
+      </Border>
+    </UniformGrid>
+
+    <TextBlock x:Name="Footer" Grid.Row="2" Style="{StaticResource Text.Muted}" Margin="0,12,0,0" TextWrapping="Wrap" />
+  </Grid>
+</Window>

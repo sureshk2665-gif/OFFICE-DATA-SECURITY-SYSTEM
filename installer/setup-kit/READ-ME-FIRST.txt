@@ -1,0 +1,54 @@
+OFFICE COMPUTER SECURITY - SETUP KIT
+====================================
+
+This folder makes ONE setup program, OfficeSecurity-Setup.exe, for all office computers.
+
+A) MAKE THE SETUP PROGRAM (once)
+   1. Right-click the downloaded zip file > "Extract All..." > Extract.
+   2. In the extracted folder, double-click MAKE-SETUP.bat.
+      (If Windows shows "Windows protected your PC", click "More info" > "Run anyway".)
+   3. After 1-3 minutes it shows DONE, and OfficeSecurity-Setup.exe is in this folder.
+   It uses IExpress, which is part of Windows. Nothing is downloaded.
+   (A ready-made OfficeSecurity-Setup.exe is also available from the same build, under
+   the artifact "OfficeSecurity-Setup".)
+
+B) MAIN OFFICE COMPUTER (do this first, on ONE computer that stays switched on)
+   1. Double-click OfficeSecurity-Setup.exe and allow administrator permission.
+   2. Choose "Main office computer".
+   3. It installs the server as a Windows service (starts with Windows, no black window),
+      opens network port 5443 for private networks, and shows:
+        - the server address, e.g. https://192.168.0.166:5443
+        - the PAIRING CODE
+        - the FIRST ADMINISTRATOR SETUP CODE
+      (also saved in C:\ProgramData\OfficeSecurity\Server\)
+   4. Open "Office Security" on the desktop > "Administrator sign-in".
+      Connect with the address and pairing code, create the first administrator with the
+      setup code, and set up your authenticator app.
+   If you started OfficeSecurity.Server.exe by hand before, setup closes that window and
+   keeps its data.
+
+C) EACH STAFF COMPUTER
+   1. On the main office computer: Office Security > Administrator > Computers > "Add computer".
+      Note the server address, pairing code and enrollment code (valid 24 hours).
+   2. On the staff computer, double-click OfficeSecurity-Setup.exe, allow administrator
+      permission, choose "Staff computer" and type the three values.
+   3. On the main office computer: Computers > select the new computer > Approve.
+   4. Staff open "Office Security" on the desktop > "Staff sign-in".
+
+   The Administrator sign-in and the Staff sign-in are completely separate: separate
+   accounts, separate screens. Staff computers only show the Staff sign-in.
+
+D) UPDATING
+   Run a newer OfficeSecurity-Setup.exe the same way. The main office computer keeps all
+   its data; staff computers keep their registration (no new codes needed).
+
+E) REMOVING
+   Windows Settings > Apps > "Office Computer Security" > Uninstall.
+   - Staff computer: needs the uninstall code from the dashboard
+     (Computers > select the computer > Uninstall code). Without it nothing is removed.
+   - Main office computer: the server is removed, but its data is kept in
+     C:\ProgramData\OfficeSecurity\Server (delete it yourself only if you are sure).
+
+What is inside: files\App\OfficeSecurity.exe (the combined program), files\Server\
+(the central server), files\Agent\ (the security agent), files\install.ps1 (the setup
+steps, readable text) and files\setup.cmd. No passwords or keys are included.

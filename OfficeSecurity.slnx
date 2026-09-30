@@ -9,6 +9,7 @@
     <Project Path="src/Clients/OfficeSecurity.AdminDashboard/OfficeSecurity.AdminDashboard.csproj" />
     <Project Path="src/Clients/OfficeSecurity.Client.Core/OfficeSecurity.Client.Core.csproj" />
     <Project Path="src/Clients/OfficeSecurity.Client.Wpf/OfficeSecurity.Client.Wpf.csproj" />
+    <Project Path="src/Clients/OfficeSecurity.Desktop/OfficeSecurity.Desktop.csproj" />
     <Project Path="src/Clients/OfficeSecurity.StaffApp/OfficeSecurity.StaffApp.csproj" />
   </Folder>
   <Folder Name="/src/Server/">

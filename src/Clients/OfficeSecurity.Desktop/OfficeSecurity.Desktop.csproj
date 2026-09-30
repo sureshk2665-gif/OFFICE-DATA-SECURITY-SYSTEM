@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- The combined program: one icon, a start screen with separate Administrator and Staff sign-ins. -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <AssemblyName>OfficeSecurity</AssemblyName>
+    <RootNamespace>OfficeSecurity.Desktop</RootNamespace>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <!-- The two referenced programs are built as part of this one; their own start-up code is not used. -->
+    <ValidateExecutableReferencesMatchSelfContained>false</ValidateExecutableReferencesMatchSelfContained>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="CommunityToolkit.Mvvm" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\OfficeSecurity.Client.Core\OfficeSecurity.Client.Core.csproj" />
+    <ProjectReference Include="..\OfficeSecurity.Client.Wpf\OfficeSecurity.Client.Wpf.csproj" />
+    <ProjectReference Include="..\OfficeSecurity.AdminDashboard\OfficeSecurity.AdminDashboard.csproj" />
+    <ProjectReference Include="..\OfficeSecurity.StaffApp\OfficeSecurity.StaffApp.csproj" />
+  </ItemGroup>
+</Project>

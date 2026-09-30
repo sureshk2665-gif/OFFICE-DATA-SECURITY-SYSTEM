@@ -1,0 +1,19 @@
+<Application x:Class="OfficeSecurity.Desktop.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             ShutdownMode="OnExplicitShutdown">
+  <!-- Screens of both parts; their layouts use different types and keys, so they can be loaded together. -->
+  <Application.Resources>
+    <ResourceDictionary>
+      <ResourceDictionary.MergedDictionaries>
+        <ResourceDictionary Source="pack://application:,,,/OfficeSecurity.Client.Wpf;component/Themes/SharedViews.xaml" />
+        <ResourceDictionary Source="pack://application:,,,/OfficeSecurity.AdminDashboard;component/Views/SignInViews.xaml" />
+        <ResourceDictionary Source="pack://application:,,,/OfficeSecurity.AdminDashboard;component/Views/WorkspaceViews.xaml" />
+        <ResourceDictionary Source="pack://application:,,,/OfficeSecurity.AdminDashboard;component/Views/ComputerViews.xaml" />
+        <ResourceDictionary Source="pack://application:,,,/OfficeSecurity.AdminDashboard;component/Views/SoftwareViews.xaml" />
+        <ResourceDictionary Source="pack://application:,,,/OfficeSecurity.AdminDashboard;component/Views/AlertViews.xaml" />
+        <ResourceDictionary Source="pack://application:,,,/OfficeSecurity.StaffApp;component/Views/StaffViews.xaml" />
+      </ResourceDictionary.MergedDictionaries>
+    </ResourceDictionary>
+  </Application.Resources>
+</Application>
