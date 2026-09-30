@@ -8,7 +8,7 @@ A) MAKE THE SETUP PROGRAM (once)
    2. In the extracted folder, double-click MAKE-SETUP.bat.
       (If Windows shows "Windows protected your PC", click "More info" > "Run anyway".)
    3. After 1-3 minutes it shows DONE, and OfficeSecurity-Setup.exe is in this folder.
-   It uses IExpress, which is part of Windows. Nothing is downloaded.
+   It uses the C# compiler that is part of Windows (.NET Framework 4.8). Nothing is downloaded.
    (A ready-made OfficeSecurity-Setup.exe is also available from the same build, under
    the artifact "OfficeSecurity-Setup".)
 
@@ -51,4 +51,5 @@ E) REMOVING
 
 What is inside: files\App\OfficeSecurity.exe (the combined program), files\Server\
 (the central server), files\Agent\ (the security agent), files\install.ps1 (the setup
-steps, readable text) and files\setup.cmd. No passwords or keys are included.
+steps, readable text) and files\setup-program\ (the source of the small setup program that
+unpacks the files and runs install.ps1). No passwords or keys are included.

@@ -1,7 +1,8 @@
 <#
   Office Computer Security System - setup and removal.
 
-  Runs inside OfficeSecurity-Setup.exe (made by MAKE-SETUP.bat), or directly from the extracted kit.
+  Runs inside OfficeSecurity-Setup.exe (made by MAKE-SETUP.bat), which unpacks the program files next
+  to this script and passes its arguments on (for example: OfficeSecurity-Setup.exe -Role Main -Quiet).
   Windows PowerShell 5.1 compatible (built into Windows 10 and 11).
 
   Interactive:   install.ps1                     (asks: main office computer or staff computer)
@@ -41,6 +42,7 @@ $ServerService = 'OfficeSecurityServer'
 $AgentService  = 'OfficeSecurityAgent'
 $FirewallRule  = 'Office Security Server (TCP 5443)'
 $ShortcutName  = 'Office Security.lnk'
+$script:UnpackedPayload = $null
 
 # ---------------------------------------------------------------- administrator rights
 $principal = New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())
@@ -125,6 +127,7 @@ function Get-Payload {
     $zip = Join-Path $here 'payload.zip'
     if (-not (Test-Path $zip)) { Fail 'the program files were not found next to the setup script (payload.zip or the App, Server and Agent folders).' }
     $target = Join-Path $env:TEMP ("OfficeSecuritySetup-" + [Guid]::NewGuid().ToString('N'))
+    $script:UnpackedPayload = $target
     Say 'Unpacking the program files...'
     Add-Type -AssemblyName System.IO.Compression.FileSystem
     [System.IO.Compression.ZipFile]::ExtractToDirectory($zip, $target)
@@ -402,7 +405,7 @@ try {
         try {
             if ($chosen -eq 'Main') { Install-Main $payload } else { Install-Staff $payload }
         } finally {
-            if ($payload -like "$env:TEMP*OfficeSecuritySetup-*") { Remove-Item -Path $payload -Recurse -Force -ErrorAction SilentlyContinue }
+            if ($script:UnpackedPayload) { Remove-Item -Path $payload -Recurse -Force -ErrorAction SilentlyContinue }
         }
     }
 } catch {

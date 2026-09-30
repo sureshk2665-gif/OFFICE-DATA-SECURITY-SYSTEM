@@ -4,24 +4,24 @@ rem ======================================================================
 rem  Office Computer Security System - makes OfficeSecurity-Setup.exe
 rem
 rem  Double-click this file in the extracted folder. It packs the program
-rem  files in "files\" into ONE setup program using IExpress, which is
-rem  built into Windows. Nothing is downloaded and nothing is installed.
+rem  files in "files\" into ONE setup program, using the C# compiler that
+rem  is part of Windows (.NET Framework 4.8). Nothing is downloaded and
+rem  nothing is installed.
 rem ======================================================================
 
 set "KIT=%~dp0"
 set "FILES=%KIT%files"
 set "OUT=%KIT%OfficeSecurity-Setup.exe"
-rem IExpress is happiest with a work folder without spaces: use the short form of the TEMP path.
-for %%I in ("%TEMP%") do set "SHORTTEMP=%%~sI"
-if not defined SHORTTEMP set "SHORTTEMP=%TEMP%"
-set "WORK=%SHORTTEMP%\OCSS-MakeSetup-%RANDOM%%RANDOM%"
+set "WORK=%TEMP%\OCSS-MakeSetup-%RANDOM%%RANDOM%"
+set "CSC=%WINDIR%\Microsoft.NET\Framework64\v4.0.30319\csc.exe"
+if not exist "%CSC%" set "CSC=%WINDIR%\Microsoft.NET\Framework\v4.0.30319\csc.exe"
 
 echo.
 echo  Office Computer Security - making the setup program
 echo  ---------------------------------------------------
 echo.
 
-for %%F in ("App\OfficeSecurity.exe" "Server\OfficeSecurity.Server.exe" "Agent\OfficeSecurity.Agent.exe" "install.ps1" "setup.cmd") do (
+for %%F in ("App\OfficeSecurity.exe" "Server\OfficeSecurity.Server.exe" "Agent\OfficeSecurity.Agent.exe" "install.ps1" "setup-program\Setup.cs" "setup-program\setup.manifest") do (
   if not exist "%FILES%\%%~F" (
     echo  ERROR: "files\%%~F" is missing.
     echo  Extract the WHOLE zip file first ^(right-click the zip, "Extract All..."^),
@@ -30,80 +30,29 @@ for %%F in ("App\OfficeSecurity.exe" "Server\OfficeSecurity.Server.exe" "Agent\O
   )
 )
 
-if not exist "%SystemRoot%\System32\iexpress.exe" (
-  echo  ERROR: IExpress ^(part of Windows^) was not found on this computer.
+if not exist "%CSC%" (
+  echo  ERROR: the C# compiler of .NET Framework 4 was not found on this computer.
+  echo  It is part of Windows 10 and 11. Turn on ".NET Framework 4.8 Advanced Services"
+  echo  in "Turn Windows features on or off", then try again.
   goto :failed
 )
 
 mkdir "%WORK%" || goto :failed
 
-echo  [1/3] Packing the program files ^(about a minute^)...
+echo  [1/2] Packing the program files ^(about a minute^)...
 powershell -NoProfile -ExecutionPolicy Bypass -Command ^
-  "$ErrorActionPreference='Stop'; Add-Type -AssemblyName System.IO.Compression.FileSystem; $zip=[IO.Compression.ZipFile]::Open('%WORK%\payload.zip','Create'); try { foreach ($d in 'App','Server','Agent') { $root='%FILES%\'; Get-ChildItem -Path ($root+$d) -Recurse -File | ForEach-Object { [void][IO.Compression.ZipFileExtensions]::CreateEntryFromFile($zip, $_.FullName, $_.FullName.Substring($root.Length), 'Optimal') } } } finally { $zip.Dispose() }"
+  "$ErrorActionPreference='Stop'; Add-Type -AssemblyName System.IO.Compression.FileSystem; $root=$env:FILES+'\'; $zip=[IO.Compression.ZipFile]::Open($env:WORK+'\payload.zip','Create'); try { foreach ($d in 'App','Server','Agent') { Get-ChildItem -LiteralPath ($root+$d) -Recurse -File | ForEach-Object { [void][IO.Compression.ZipFileExtensions]::CreateEntryFromFile($zip, $_.FullName, $_.FullName.Substring($root.Length), 'Optimal') } }; [void][IO.Compression.ZipFileExtensions]::CreateEntryFromFile($zip, $root+'install.ps1', 'install.ps1', 'Optimal') } finally { $zip.Dispose() }"
 if errorlevel 1 goto :failed
-copy /y "%FILES%\install.ps1" "%WORK%\install.ps1" >nul || goto :failed
-copy /y "%FILES%\setup.cmd" "%WORK%\setup.cmd" >nul || goto :failed
 
-echo  [2/3] Writing the IExpress instructions...
-set "SED=%WORK%\setup.sed"
->>"%SED%" echo [Version]
->>"%SED%" echo Class=IEXPRESS
->>"%SED%" echo SEDVersion=3
->>"%SED%" echo [Options]
->>"%SED%" echo PackagePurpose=InstallApp
->>"%SED%" echo ShowInstallProgramWindow=0
->>"%SED%" echo HideExtractAnimation=0
->>"%SED%" echo UseLongFileName=1
->>"%SED%" echo InsideCompressed=0
->>"%SED%" echo CAB_FixedSize=0
->>"%SED%" echo CAB_ResvCodeSigning=0
->>"%SED%" echo RebootMode=N
->>"%SED%" echo InstallPrompt=%%InstallPrompt%%
->>"%SED%" echo DisplayLicense=%%DisplayLicense%%
->>"%SED%" echo FinishMessage=%%FinishMessage%%
->>"%SED%" echo TargetName=%%TargetName%%
->>"%SED%" echo FriendlyName=%%FriendlyName%%
->>"%SED%" echo AppLaunched=%%AppLaunched%%
->>"%SED%" echo PostInstallCmd=%%PostInstallCmd%%
->>"%SED%" echo AdminQuietInstCmd=%%AdminQuietInstCmd%%
->>"%SED%" echo UserQuietInstCmd=%%UserQuietInstCmd%%
->>"%SED%" echo SourceFiles=SourceFiles
->>"%SED%" echo [Strings]
->>"%SED%" echo InstallPrompt=
->>"%SED%" echo DisplayLicense=
->>"%SED%" echo FinishMessage=
->>"%SED%" echo TargetName=%OUT%
->>"%SED%" echo FriendlyName=Office Computer Security Setup
->>"%SED%" echo AppLaunched=cmd.exe /c setup.cmd
->>"%SED%" echo PostInstallCmd=^<None^>
->>"%SED%" echo AdminQuietInstCmd=cmd.exe /c setup.cmd
->>"%SED%" echo UserQuietInstCmd=cmd.exe /c setup.cmd
->>"%SED%" echo FILE0="payload.zip"
->>"%SED%" echo FILE1="install.ps1"
->>"%SED%" echo FILE2="setup.cmd"
->>"%SED%" echo [SourceFiles]
->>"%SED%" echo SourceFiles0=%WORK%\
->>"%SED%" echo [SourceFiles0]
->>"%SED%" echo %%FILE0%%=
->>"%SED%" echo %%FILE1%%=
->>"%SED%" echo %%FILE2%%=
-
-echo  [3/3] Building OfficeSecurity-Setup.exe ^(1-3 minutes^)...
+echo  [2/2] Building OfficeSecurity-Setup.exe...
 if exist "%OUT%" del /f /q "%OUT%"
-rem "start /wait" makes sure this waits for IExpress (a Windows program) to finish.
-start "IExpress" /wait "%SystemRoot%\System32\iexpress.exe" /N /Q "%WORK%\setup.sed"
-rem IExpress can hand the work to a second copy of itself: wait until none is left (up to 10 minutes).
-for /l %%N in (1,1,120) do (
-  tasklist /fi "imagename eq iexpress.exe" 2>nul | find /i "iexpress.exe" >nul && ping -n 6 127.0.0.1 >nul
-)
-if not exist "%OUT%" (
-  echo  ERROR: IExpress did not create the setup program.
-  echo  Instructions used:
-  type "%SED%"
-  echo  Work folder:
-  dir "%WORK%"
-  goto :failed
-)
+"%CSC%" /nologo /target:winexe /platform:x64 /optimize+ /out:"%OUT%" ^
+  /win32manifest:"%FILES%\setup-program\setup.manifest" ^
+  /resource:"%WORK%\payload.zip",payload.zip ^
+  /reference:System.IO.Compression.dll /reference:System.IO.Compression.FileSystem.dll /reference:System.Windows.Forms.dll ^
+  "%FILES%\setup-program\Setup.cs"
+if errorlevel 1 goto :failed
+if not exist "%OUT%" goto :failed
 
 rmdir /s /q "%WORK%" 2>nul
 echo.
