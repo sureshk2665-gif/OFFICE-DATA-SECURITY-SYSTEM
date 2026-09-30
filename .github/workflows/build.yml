@@ -210,6 +210,8 @@ jobs:
             Check ($null -ne (Get-NetFirewallRule -DisplayName "Office Security Server (TCP 5443)" -ErrorAction SilentlyContinue)) "firewall rule for TCP 5443 exists"
             Check (Test-Path "$root\App\OfficeSecurity.exe") "combined program installed"
             Check ((Get-Content "$root\App\role.txt").Trim() -eq "MAIN") "installed as main office computer"
+            $connection = @(Get-Content "$root\App\connection.txt")
+            Check ($connection[0] -eq "localhost" -and $connection[1] -match '^[0-9A-F]{4}(-[0-9A-F]{4}){4}$') "program's Connect screen is filled in (localhost + pairing code)"
             Check (Test-Path (Join-Path ([Environment]::GetFolderPath('CommonDesktopDirectory')) "Office Security.lnk")) "desktop shortcut"
             Check (Test-Path (Join-Path ([Environment]::GetFolderPath('CommonPrograms')) "Office Security.lnk")) "Start menu shortcut"
             $entry = Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\OfficeSecurity" -ErrorAction SilentlyContinue
@@ -281,7 +283,10 @@ jobs:
           if ($p.ExitCode -ne 2) { throw "expected exit code 2" }
           if (-not (Select-String -Path $log -SimpleMatch "-Role Main or -Role Staff is needed" -Quiet)) { throw "install.ps1 did not run with the arguments" }
           if (Get-ChildItem $env:TEMP -Filter "OfficeSecuritySetup-*" -Directory) { throw "temporary files were left behind" }
-          Write-Host "Setup program packs and unpacks correctly."
+          # The setup window (all pages) must build without errors.
+          $p = Start-Process $setup -ArgumentList "--smoke-test" -Wait -PassThru
+          if ($p.ExitCode -ne 0) { throw "setup window self-test failed ($($p.ExitCode))" }
+          Write-Host "Setup program packs and unpacks correctly; setup window self-test passed."
 
   secret-scan:
     runs-on: ubuntu-latest

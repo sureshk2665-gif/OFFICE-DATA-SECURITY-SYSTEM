@@ -4,13 +4,14 @@ using CommunityToolkit.Mvvm.Input;
 namespace OfficeSecurity.Client.Core.ViewModels;
 
 /// <summary>First-time connection to the office server using its address and pairing code.</summary>
-public sealed partial class ConnectViewModel(ClientSettingsStore store, Action<ClientSettings> onPaired) : BusyViewModel
+public sealed partial class ConnectViewModel(ClientSettingsStore store, Action<ClientSettings> onPaired, PreconfiguredConnection? preset = null) : BusyViewModel
 {
     [ObservableProperty]
-    public partial string ServerAddress { get; set; } = store?.Load().ServerAddress ?? string.Empty;
+    public partial string ServerAddress { get; set; } = store?.Load().ServerAddress is { Length: > 0 } saved ? saved : preset?.ServerAddress ?? string.Empty;
 
+    // Filled in by the setup program on the main office computer, so there is nothing to type there.
     [ObservableProperty]
-    public partial string PairingCodeText { get; set; } = string.Empty;
+    public partial string PairingCodeText { get; set; } = preset?.PairingCode ?? string.Empty;
 
     [RelayCommand]
     private Task ConnectAsync() => RunAsync(async () =>

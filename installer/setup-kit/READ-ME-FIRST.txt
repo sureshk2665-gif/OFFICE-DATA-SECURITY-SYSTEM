@@ -13,25 +13,23 @@ A) MAKE THE SETUP PROGRAM (once)
    the artifact "OfficeSecurity-Setup".)
 
 B) MAIN OFFICE COMPUTER (do this first, on ONE computer that stays switched on)
-   1. Double-click OfficeSecurity-Setup.exe and allow administrator permission.
-   2. Choose "Main office computer".
-   3. It installs the server as a Windows service (starts with Windows, no black window),
-      opens network port 5443 for private networks, and shows:
-        - the server address, e.g. https://192.168.0.166:5443
-        - the PAIRING CODE
-        - the FIRST ADMINISTRATOR SETUP CODE
-      (also saved in C:\ProgramData\OfficeSecurity\Server\)
-   4. Open "Office Security" on the desktop > "Administrator sign-in".
-      Connect with the address and pairing code, create the first administrator with the
-      setup code, and set up your authenticator app.
-   If you started OfficeSecurity.Server.exe by hand before, setup closes that window and
-   keeps its data.
+   1. Double-click OfficeSecurity-Setup.exe and click Yes when Windows asks for permission.
+   2. Welcome > Next > choose "Main office computer" > Install.
+   3. The Finish page shows the FIRST ADMINISTRATOR SETUP CODE, the address for staff
+      computers and the PAIRING CODE (also saved in C:\ProgramData\OfficeSecurity\Server\).
+      Keep "Open Office Security now" ticked and click Finish.
+   4. Choose "Administrator sign-in". The server address and pairing code are already
+      filled in: click Connect, create the first administrator with the setup code, and set
+      up your authenticator app.
+   The server runs in the background as a Windows service (no window) and starts with Windows.
+   If you started OfficeSecurity.Server.exe by hand before, setup closes it and keeps its data.
 
 C) EACH STAFF COMPUTER
-   1. On the main office computer: Office Security > Administrator > Computers > "Add computer".
-      Note the server address, pairing code and enrollment code (valid 24 hours).
-   2. On the staff computer, double-click OfficeSecurity-Setup.exe, allow administrator
-      permission, choose "Staff computer" and type the three values.
+   1. On the main office computer: Office Security > Administrator sign-in > Computers >
+      "Add computer". Note the server address, pairing code and enrollment code (24 hours).
+   2. On the staff computer, double-click OfficeSecurity-Setup.exe > Yes > Next >
+      "Staff computer" > Next, type the three values > Install > Finish.
+      (A mistyped code is reported on the last page: click Back and correct it.)
    3. On the main office computer: Computers > select the new computer > Approve.
    4. Staff open "Office Security" on the desktop > "Staff sign-in".
 
@@ -39,7 +37,7 @@ C) EACH STAFF COMPUTER
    accounts, separate screens. Staff computers only show the Staff sign-in.
 
 D) UPDATING
-   Run a newer OfficeSecurity-Setup.exe the same way. The main office computer keeps all
+   Run a newer OfficeSecurity-Setup.exe: it recognises the installed version and offers Install. The main office computer keeps all
    its data; staff computers keep their registration (no new codes needed).
 
 E) REMOVING

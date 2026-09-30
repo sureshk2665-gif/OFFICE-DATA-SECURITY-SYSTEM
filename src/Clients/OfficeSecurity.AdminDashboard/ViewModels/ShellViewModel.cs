@@ -66,7 +66,7 @@ public sealed partial class ShellViewModel : ObservableObject
     {
         _settings = settings;
         _ = StartAsync();
-    });
+    }, PreconfiguredConnection.Read());
 
     public void ShowLogin(string? info = null, string? error = null) =>
         Current = new LoginViewModel(this) { InfoMessage = info ?? string.Empty, ErrorMessage = error ?? string.Empty };

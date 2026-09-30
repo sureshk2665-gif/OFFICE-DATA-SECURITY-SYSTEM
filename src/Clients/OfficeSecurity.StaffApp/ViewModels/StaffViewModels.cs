@@ -67,7 +67,7 @@ public sealed partial class StaffShellViewModel : ObservableObject
             {
                 _settings = settings;
                 Start();
-            })
+            }, PreconfiguredConnection.Read())
             { InfoMessage = notice ?? string.Empty };
             return;
         }

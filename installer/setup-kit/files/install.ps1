@@ -23,7 +23,8 @@ param(
     [switch] $Uninstall,
     [string] $UninstallCode = '',
     [switch] $Quiet,
-    [string] $LogFile = ''
+    [string] $LogFile = '',
+    [string] $ResultFile = ''
 )
 
 $ErrorActionPreference = 'Stop'
@@ -68,16 +69,26 @@ if ($LogFile) { Start-Transcript -Path $LogFile -Append | Out-Null }
 Add-Type -AssemblyName System.Windows.Forms, System.Drawing, Microsoft.VisualBasic
 [System.Windows.Forms.Application]::EnableVisualStyles()
 
-function Say([string] $text) { Write-Host $text }
+# Progress lines start with "STEP: " (the setup window shows them); everything else is detail for the log.
+function Say([string] $text) { Write-Host "STEP: $text" }
+
+# For the setup window: simple "name=value" lines (line breaks written as \n).
+function Write-Result([hashtable] $values) {
+    if (-not $ResultFile) { return }
+    $lines = foreach ($key in $values.Keys) { "$key=" + ([string]$values[$key]).Replace("`r", '').Replace("`n", '\n') }
+    [IO.File]::WriteAllLines($ResultFile, [string[]]$lines, (New-Object Text.UTF8Encoding($false)))
+}
 
 function Show-Message([string] $text, [string] $icon = 'Information') {
-    Say $text
+    Write-Host $text
     if (-not $Quiet) {
         [void][System.Windows.Forms.MessageBox]::Show($text, "$ProductName setup", 'OK', $icon)
     }
 }
 
 function Fail([string] $text, [int] $code = 1) {
+    $sentence = $text.Substring(0, 1).ToUpperInvariant() + $text.Substring(1)
+    Write-Result @{ Status = 'Failed'; Message = "Setup stopped: $sentence`n`nNothing more was changed." }
     Show-Message ("Setup stopped: $text`n`nNothing more was changed.") 'Error'
     if ($LogFile) { Stop-Transcript | Out-Null }
     exit $code
@@ -239,12 +250,17 @@ function Ask-StaffCodes {
 }
 
 # ---------------------------------------------------------------- common parts
-function Install-App([string] $payload, [string] $role) {
+function Install-App([string] $payload, [string] $role, [string] $serverAddress, [string] $pairingCode) {
     Say 'Installing the Office Security program...'
     # Close a running copy so its files can be replaced.
     Get-Process -Name 'OfficeSecurity' -ErrorAction SilentlyContinue | Where-Object { $_.Path -like "$AppDir*" } | Stop-Process -Force
     Copy-Folder (Join-Path $payload 'App') $AppDir
     Set-Content -Path (Join-Path $AppDir 'role.txt') -Value $role -Encoding ASCII
+    # Fills in the server address and pairing code on the program's Connect screen. Not secret (the pairing code
+    # only identifies the server); kept in Program Files so only administrators can change which server is trusted.
+    if ($serverAddress -and $pairingCode) {
+        Set-Content -Path (Join-Path $AppDir 'connection.txt') -Value @($serverAddress, $pairingCode) -Encoding ASCII
+    }
     foreach ($link in Get-ShortcutPaths) { New-Shortcut $link (Join-Path $AppDir 'OfficeSecurity.exe') }
 
     # Keep this script (in Program Files, which only administrators can change) for removal.
@@ -260,7 +276,7 @@ function Install-App([string] $payload, [string] $role) {
         Publisher       = $Publisher
         InstallLocation = $InstallRoot
         DisplayIcon     = (Join-Path $AppDir 'OfficeSecurity.exe')
-        UninstallString = "`"$powershell`" -NoProfile -ExecutionPolicy Bypass -File `"$(Join-Path $SetupDir 'install.ps1')`" -Uninstall"
+        UninstallString = "`"$powershell`" -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File `"$(Join-Path $SetupDir 'install.ps1')`" -Uninstall"
         Comments        = "Installed as: $(if ($role -eq 'Main') { 'main office computer' } else { 'staff computer' })"
     }
     foreach ($name in $values.Keys) { Set-ItemProperty -Path $UninstallKey -Name $name -Value $values[$name] }
@@ -321,10 +337,21 @@ function Install-Main([string] $payload) {
         Fail "the server service was installed but did not start within 90 seconds. Open 'Services' and check 'Office Security Server', or Event Viewer > Windows Logs > Application." 3
     }
 
-    Install-App $payload 'MAIN'
-
     $info = Get-Content (Join-Path $ServerData 'SERVER-CONNECTION-INFO.txt') -Raw
+    $pairingMatch = [regex]::Match($info, 'Pairing code:\s*(\S+)')
+    $pairing = if ($pairingMatch.Success) { $pairingMatch.Groups[1].Value } else { '' }
+    Install-App $payload 'MAIN' 'localhost' $pairing
+
     $firstAdmin = Join-Path $ServerData 'FIRST-ADMIN-SETUP-CODE.txt'
+    # Addresses other computers can use (not this computer's own loopback names).
+    $addresses = @([regex]::Matches($info, 'https://([^\s:]+):5443') | ForEach-Object { $_.Groups[1].Value } |
+        Where-Object { $_ -notin @('127.0.0.1', 'localhost', '::1') })
+    $result = @{ Status = $(if ($wasInstalled) { 'Updated' } else { 'Installed' }); Role = 'Main'; PairingCode = $pairing; Addresses = ($addresses -join '|') }
+    if (Test-Path $firstAdmin) {
+        $codeMatch = [regex]::Match((Get-Content $firstAdmin -Raw), '(?m)^\s*([A-Z0-9]{4}(-[A-Z0-9]{4})+)\s*$')
+        if ($codeMatch.Success) { $result.SetupCode = $codeMatch.Groups[1].Value }
+    }
+    Write-Result $result
     $text = "Installed. The server now runs in the background and starts with Windows.`n`n$info"
     if (Test-Path $firstAdmin) {
         $text += "`n" + (Get-Content $firstAdmin -Raw)
@@ -349,7 +376,8 @@ function Install-Staff([string] $payload) {
             Start-Service -Name $AgentService -ErrorAction SilentlyContinue
         }
         if ((Get-Service -Name $AgentService).Status -ne 'Running') { Fail 'the security agent did not start again after the update. Restart the computer.' 3 }
-        Install-App $payload 'STAFF'
+        Install-App $payload 'STAFF' '' ''
+        Write-Result @{ Status = 'Updated'; Role = 'Staff' }
         Show-Message "Updated. The security agent is running again.`n`nOpen 'Office Security' on the desktop and choose Staff sign-in."
         return
     }
@@ -365,10 +393,15 @@ function Install-Staff([string] $payload) {
     Say 'Installing the security agent and registering with the server...'
     $output = & (Join-Path $payload 'Agent\OfficeSecurity.Agent.exe') install --server $server --pairing-code $pairing --enrollment-code $enrollment 2>&1 | Out-String
     $code = $LASTEXITCODE
-    Say $output
-    if ($code -ne 0) { Fail "the security agent could not be installed (code $code):`n`n$($output.Trim())" 4 }
+    Write-Host $output
+    if ($code -ne 0) {
+        # The agent's last line says what was wrong (for example a mistyped pairing code).
+        $reason = ($output.Trim() -split "`r?`n" | Where-Object { $_.Trim() } | Select-Object -Last 1)
+        Fail "the security agent could not be installed: $reason" 4
+    }
 
-    Install-App $payload 'STAFF'
+    Install-App $payload 'STAFF' $server $pairing
+    Write-Result @{ Status = 'Installed'; Role = 'Staff' }
     Show-Message "Installed. The security agent is running and registered.`n`nNow, on the main office computer: Administrator > Computers > select this computer > Approve.`n`nStaff open 'Office Security' on the desktop and choose Staff sign-in."
 }
 
@@ -392,7 +425,7 @@ function Uninstall-All {
         if ($code) { $arguments += @('--code', $code.Trim()) }
         $output = & $AgentExe @arguments 2>&1 | Out-String
         $exit = $LASTEXITCODE
-        Say $output
+        Write-Host $output
         if ($exit -ne 0) { Fail "the security agent was not removed (code $exit):`n`n$($output.Trim())" 7 }
     }
 
