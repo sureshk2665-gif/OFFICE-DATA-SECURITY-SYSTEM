@@ -95,12 +95,27 @@ function Invoke-Sc([string[]] $arguments) {
     if ($LASTEXITCODE -ne 0) { throw "sc.exe $($arguments -join ' ') failed ($LASTEXITCODE): $output" }
 }
 
-function Stop-ServiceAndWait([string] $name) {
+function Stop-ServiceAndWait([string] $name, [string] $programFolder) {
     $service = Get-Service-Or-Null $name
     if ($service -and $service.Status -ne 'Stopped') {
         Say "Stopping $name..."
         Stop-Service -Name $name -Force
         $service.WaitForStatus('Stopped', [TimeSpan]::FromSeconds(60))
+    }
+    # Windows reports "stopped" slightly before the program has closed and released its files.
+    if ($programFolder) {
+        for ($i = 0; $i -lt 60; $i++) {
+            $running = Get-Process -ErrorAction SilentlyContinue | Where-Object { $_.Path -and $_.Path -like "$programFolder\*" }
+            if (-not $running) { return }
+            Start-Sleep -Seconds 1
+        }
+        throw "the program in $programFolder did not close within 60 seconds."
+    }
+}
+
+function Copy-WithRetry([scriptblock] $copy) {
+    for ($i = 1; ; $i++) {
+        try { & $copy; return } catch { if ($i -ge 10) { throw } ; Start-Sleep -Seconds 2 }
     }
 }
 
@@ -272,9 +287,16 @@ function Install-Main([string] $payload) {
         Start-Sleep -Seconds 2
     }
 
-    Stop-ServiceAndWait $ServerService
-    Say 'Installing the server...'
-    Copy-Folder (Join-Path $payload 'Server') $ServerDir
+    $wasInstalled = [bool](Get-Service-Or-Null $ServerService)
+    try {
+        Stop-ServiceAndWait $ServerService $ServerDir
+        Say 'Installing the server...'
+        Copy-WithRetry { Copy-Folder (Join-Path $payload 'Server') $ServerDir }
+    } catch {
+        # Do not leave the office without its server: start the version that was there before.
+        if ($wasInstalled) { Start-Service -Name $ServerService -ErrorAction SilentlyContinue }
+        Fail "the server files could not be updated, so the previous version was started again: $($_.Exception.Message)" 3
+    }
 
     if (-not (Get-Service-Or-Null $ServerService)) {
         Invoke-Sc @('create', $ServerService, 'binPath=', "`"$serverExe`"", 'start=', 'auto', 'DisplayName=', 'Office Security Server')
@@ -319,9 +341,14 @@ function Install-Staff([string] $payload) {
     if ($existing -and (Test-Path $AgentExe)) {
         # Already protected: update the agent program in place and keep its registration.
         Say 'Updating the security agent (it keeps its registration)...'
-        Stop-ServiceAndWait $AgentService
-        Copy-Item -Path (Join-Path $payload 'Agent\OfficeSecurity.Agent.exe') -Destination $AgentExe -Force
-        Start-Service -Name $AgentService
+        try {
+            Stop-ServiceAndWait $AgentService (Split-Path $AgentExe)
+            Copy-WithRetry { Copy-Item -Path (Join-Path $payload 'Agent\OfficeSecurity.Agent.exe') -Destination $AgentExe -Force }
+        } finally {
+            # Whatever happened, the computer must stay protected.
+            Start-Service -Name $AgentService -ErrorAction SilentlyContinue
+        }
+        if ((Get-Service -Name $AgentService).Status -ne 'Running') { Fail 'the security agent did not start again after the update. Restart the computer.' 3 }
         Install-App $payload 'STAFF'
         Show-Message "Updated. The security agent is running again.`n`nOpen 'Office Security' on the desktop and choose Staff sign-in."
         return
@@ -370,7 +397,7 @@ function Uninstall-All {
     }
 
     if (Get-Service-Or-Null $ServerService) {
-        Stop-ServiceAndWait $ServerService
+        Stop-ServiceAndWait $ServerService $ServerDir
         Invoke-Sc @('delete', $ServerService)
         Get-NetFirewallRule -DisplayName $FirewallRule -ErrorAction SilentlyContinue | Remove-NetFirewallRule
     }
