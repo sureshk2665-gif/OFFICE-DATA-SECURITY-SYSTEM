@@ -158,7 +158,7 @@ jobs:
           Remove-Item "$kit/files/App/*.runtimeconfig.json"
           Copy-Item -Recurse publish/OfficeSecurity-win-x64/Server "$kit/files/Server"
           Copy-Item -Recurse publish/OfficeSecurity-win-x64/Agent "$kit/files/Agent"
-          Copy-Item installer/setup-kit/files/* "$kit/files/"
+          Copy-Item -Recurse installer/setup-kit/files/* "$kit/files/"
           Copy-Item installer/setup-kit/MAKE-SETUP.bat, installer/setup-kit/READ-ME-FIRST.txt $kit
           Get-ChildItem -Recurse -File $kit | ForEach-Object { "{0,12:N0}  {1}" -f $_.Length, $_.FullName.Substring((Resolve-Path $kit).Path.Length) }
 
@@ -263,7 +263,7 @@ jobs:
           $kit = "D:\ocss kit (test)"
           New-Item -ItemType Directory -Force "$kit\files\App", "$kit\files\Server", "$kit\files\Agent" | Out-Null
           Copy-Item installer/setup-kit/MAKE-SETUP.bat $kit
-          Copy-Item installer/setup-kit/files/* "$kit\files"
+          Copy-Item -Recurse installer/setup-kit/files/* "$kit\files"
           foreach ($f in "App\OfficeSecurity.exe", "Server\OfficeSecurity.Server.exe", "Agent\OfficeSecurity.Agent.exe") { Copy-Item "$env:SystemRoot\System32\whoami.exe" "$kit\files\$f" }
           $env:OCSS_NO_PAUSE = "1"
           cmd.exe /c "`"$kit\MAKE-SETUP.bat`""
