@@ -1,6 +1,6 @@
 # Setup kit and combined program - test report
 
-Run: GitHub Actions run 36674205199 (Windows Server 2025 runner, Windows PowerShell 5.1), all jobs green.
+Runs: GitHub Actions 36674205199 and 36698147296 (setup wizard) (Windows Server 2025 runner, Windows PowerShell 5.1), all jobs green.
 
 ## What was built
 - `OfficeSecurity.exe` - combined program: start screen with separate **Administrator** and **Staff** sign-ins
@@ -21,6 +21,8 @@ Run: GitHub Actions run 36674205199 (Windows Server 2025 runner, Windows PowerSh
 | Update over an existing install: server runs again, data kept (same pairing code) | PASS |
 | Staff install with a wrong pairing code: refused, no agent installed, nothing changed | PASS |
 | Uninstall: service, firewall rule, program files and Apps entry removed; server data kept | PASS |
+| Setup wizard window: every page builds (self-test) | PASS |
+| Main office computer: program's Connect screen filled in (localhost + pairing code) | PASS |
 
 ## Defects found and fixed during testing
 1. IExpress (first packaging choice) exited without creating a file on the runner: replaced by the
@@ -30,8 +32,8 @@ Run: GitHub Actions run 36674205199 (Windows Server 2025 runner, Windows PowerSh
    and restarts the previous version if an update still fails.
 
 ## Not tested (needs real office computers)
-- Interactive dialogs (choice of computer type, code entry, uninstall-code prompt) - CI runs setup with
-  `-Quiet`. The same code paths run after the dialogs.
+- Clicking through the setup wizard (CI checks that every page builds, and runs the same install steps
+  with `-Quiet`); the uninstall-code prompt.
 - A successful staff computer install through the setup program (needs a dashboard enrollment code
   and approval; the agent install itself is covered by the agent end-to-end test).
 - Staff computer update in place and staff uninstall with a code through the setup program.
