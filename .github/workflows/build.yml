@@ -214,12 +214,15 @@ jobs:
             Check (Test-Path (Join-Path ([Environment]::GetFolderPath('CommonPrograms')) "Office Security.lnk")) "Start menu shortcut"
             $entry = Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\OfficeSecurity" -ErrorAction SilentlyContinue
             Check ($null -ne $entry -and $entry.DisplayName -eq "Office Computer Security") "listed in Windows Settings > Apps"
-            $setupCode = Get-Content (Join-Path $data "FIRST-ADMIN-SETUP-CODE.txt") -Raw
+            # The pairing code comes from the server's own certificate authority: it only stays the same if the data is kept.
+            # (The first-administrator setup code is deliberately new after every start.)
+            function PairingCode { (Select-String -Path (Join-Path $data "SERVER-CONNECTION-INFO.txt") -Pattern "Pairing code: (.+)").Matches[0].Groups[1].Value.Trim() }
+            $pairing = PairingCode
 
             Run-Setup "update" "-Role Main"
             Check ((Get-Service OfficeSecurityServer).Status -eq 'Running') "server runs again after an update"
             Check ($null -ne (Health)) "server answers after an update"
-            Check ((Get-Content (Join-Path $data "FIRST-ADMIN-SETUP-CODE.txt") -Raw) -eq $setupCode) "update kept the server data"
+            Check ((PairingCode) -eq $pairing) "update kept the server data (same pairing code: $pairing)"
 
             Run-Setup "staff-wrong-code" "-Role Staff -Server localhost -PairingCode 0000-0000-0000-0000-0000 -EnrollmentCode WRONG"
             Check ($null -eq (Get-Service OfficeSecurityAgent -ErrorAction SilentlyContinue)) "staff install with a wrong pairing code installs no agent"
